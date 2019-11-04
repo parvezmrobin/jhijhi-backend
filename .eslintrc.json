@@ -1,14 +1,12 @@
 {
   "parser": "babel-eslint",
-  "extends": ["react-app", "plugin:promise/recommended"],
+  "extends": ["plugin:promise/recommended"],
   "env": {
-    "browser": true,
     "node": true,
     "mocha": true
   },
   "rules": {
-    "no-console": "off",
-    "comma-dangle": ["warn", "always-multiline"],
-    "react/jsx-filename-extension": "off"
+    "no-console": "warn",
+    "comma-dangle": ["warn", "always-multiline"]
   }
 }
