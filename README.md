@@ -2,7 +2,7 @@
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/fa41d613-d50c-4f4b-97ac-f5749d6a3210/deploy-status)](https://app.netlify.com/sites/jhijhi/deploys)
 
-*A simple react app backed by Express JS to maintain cricket score*
+*A simple Express JS app fronted by react to maintain cricket score*
 
 ## Live
 
@@ -10,7 +10,7 @@
 
 ## Installation
 To install the app in your local machine
-make sure you have `node` and `npm` installed. Then run
+make sure you have `node` and `yarn` installed. Then run
 ```bash
 yarn install
 ```
@@ -23,11 +23,7 @@ Finally, run
 yarn run dev
 ```
 
-Wait a while. **Bingo!** The app's running in your browser.
-
-If you don't have an account (you surely won't have in the first run), 
-make one from the [Register](http://localhost:3000/register) page. 
-Login and explore.
+Wait a while. **Bingo!** 
 
 ## Seeding
 If you don't want to go through the hassle of inserting bunch of new data
