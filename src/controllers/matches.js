@@ -3,7 +3,7 @@ const router = express.Router();
 const Match = require('../models/match');
 const responses = require('../responses');
 const passport = require('passport');
-const { check, validationResult } = require('express-validator/check');
+const { check, body, validationResult } = require('express-validator/check');
 const { sendErrorResponse, send404Response, nullEmptyValues } = require('../lib/utils');
 const { Error400, Error404 } = require('../lib/errors');
 const Logger = require('../lib/logger');
@@ -147,6 +147,114 @@ const uncertainOutValidations = [
     }),
   check('kind', '`kind` should be either run out or obstructing the field')
     .isIn(['Run out', 'Obstructing the field']),
+];
+
+const RUN_OUT = 'Run out';
+const OBSTRUCTING_THE_FIELD = 'Obstructing the field';
+const UNCERTAIN_WICKETS = [RUN_OUT, OBSTRUCTING_THE_FIELD];
+
+const bowlValidations = [
+  body('playedBy', '`playedBy` should be an integer')
+    .optional({nullable: true})
+    .isInt({min: 0}),
+  body('isWicket')
+    .optional({nullable: true})
+    .custom((isWicket, {req}) => {
+      if (!Object.keys(isWicket).length) {
+        return true;
+      }
+      debugger;
+      if (typeof isWicket.kind !== 'string') {
+        throw new Error('`Wicket kind` should be a string');
+      }
+      if (UNCERTAIN_WICKETS.includes(isWicket.kind)) {
+        if (!Number.isInteger(isWicket.player)) {
+          throw new Error(`Out player should be provided for out type ${isWicket.kind}`);
+        }
+      } else { // if in CERTAIN_WICKETS
+        const {isWide, isNo} = req.body;
+        if (isWide || isNo) {
+          throw new Error(`Wicket type ${isWicket.kind} cannot happen in a ${isNo ? 'No' : 'Wide'} bowl`);
+        }
+
+        const {singles, by, legBy} = req.body;
+        const scoreType = singles ? 'single' : by ? 'by' : legBy ? 'leg by' : null;
+        if (scoreType) {
+          throw new Error(`Cannot take ${scoreType} run with wicket type ${isWicket.kind}`);
+        }
+      }
+      const {boundary} = req.body;
+      if (boundary != null && boundary.run) {
+        throw new Error('Wicket and boundary cannot happen in the same bowl');
+      }
+
+      return true;
+    }),
+  body('singles', '`singles` should be an integer')
+    .optional({nullable: true})
+    .isInt({min: 0})
+    .custom((singles, {req}) => {
+      if (singles === 0) {
+        return true;
+      }
+
+      const {legBy} = req.body;
+      if (legBy) {
+        throw new Error('Singles and leg by cannot be taken in the same bowl');
+      }
+
+      const {boundary} = req.body;
+      if (boundary && ['regular', 'legBy'].includes(boundary.kind)) {
+        const boundaryType = boundary.kind === 'regular' ? '' : 'leg by ';
+        throw new Error(`Singles and ${boundaryType}boundary cannot be taken in the same bowl`);
+      }
+
+      if (req.body.isWide) {
+        throw new Error('Singles cannot be taken in a wide bowl');
+      }
+      return true;
+    }),
+  body('by', '`by` should be an integer')
+    .optional({nullable: true})
+    .isInt({min: 0}),
+  body('legBy', '`legBy` should be an integer')
+    .optional({nullable: true})
+    .isInt({min: 0})
+    .custom((legBy, {req}) => {
+    if (legBy === 0) {
+      return true;
+    }
+
+    const {boundary} = req.body;
+    if (boundary && ['regular', 'legBy'].includes(boundary.kind)) {
+      const boundaryType = boundary.kind === 'regular' ? '' : 'leg by ';
+      throw new Error(`Leg by singles and ${boundaryType}boundary cannot be taken in the same bowl`);
+    }
+
+    if (req.body.isWide) {
+      throw new Error('Leg by singles cannot be taken in a wide bowl');
+    }
+    return true;
+  }),
+  body('boundary')
+    .optional({nullable: true})
+    .custom((boundary, {req}) => {
+      if (!Object.keys(boundary).length) {
+        return true;
+      }
+
+      if (req.body.isWide && ['regular', 'legBy'].includes(boundary.kind)) {
+        const boundaryType = boundary.kind === 'regular' ? '' : 'leg by ';
+        throw new Error(`Cannot take ${boundaryType}boundary in a wide bowl`);
+      }
+
+      return true;
+    }),
+  body('isWide', '`isWide` should be a boolean')
+    .isBoolean(),
+  body('isNo', '`isNo` should be a string')
+    .optional({nullable: true})
+    .isString(),
 ];
 
 router.put('/:id/begin', authenticateJwt(), matchBeginValidations, (request, response) => {
@@ -313,16 +421,21 @@ router.put('/:id/declare', authenticateJwt(), (request, response) => {
     .catch(err => sendErrorResponse(response, err, responses.matches.get.err, request.user));
 });
 
-router.post('/:id/bowl', authenticateJwt(), (request, response) => {
+router.post('/:id/bowl', authenticateJwt(), bowlValidations, (request, response) => {
+  const errors = validationResult(request);
+  const matchId = request.params.id;
+  const promise = errors.isEmpty() ? Match
+    .findOne({
+      _id: matchId,
+      creator: request.user._id,
+    }).exec() : Promise.reject({
+    status: 400,
+    errors: errors.array(),
+  });
   const bowl = nullEmptyValues(request);
-  const id = request.params.id;
 
   let match;
-  Match
-    .findOne({
-      _id: id,
-      creator: request.user._id,
-    })
+  promise
     .then(_match => {
       match = _match;
       let updateQuery;
@@ -353,15 +466,19 @@ router.post('/:id/bowl', authenticateJwt(), (request, response) => {
 });
 
 router.put('/:id/bowl', authenticateJwt(), (request, response) => {
-  const { bowl, overNo, bowlNo } = nullEmptyValues(request);
+  const errors = validationResult(request);
   const matchId = request.params.id;
-  Match
+  const promise = errors.isEmpty() ? Match
     .findOne({
       _id: matchId,
       creator: request.user._id,
-    })
-    .lean()
-    .exec()
+    }).lean().exec() : Promise.reject({
+    status: 400,
+    errors: errors.array(),
+  });
+
+  const { bowl, overNo, bowlNo } = nullEmptyValues(request);
+  promise
     .then(match => _updateBowlAndSend(match, bowl, response, overNo, bowlNo))
     .catch((err) => sendErrorResponse(response, err, 'Error while updating bowl', request.user));
 });
