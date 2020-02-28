@@ -39,7 +39,7 @@ module.exports.sendErrorResponse = function (response, err, message, user = null
 };
 
 module.exports.send404Response = function (response, message) {
-  logger.error('Error 404: ' + response.req.originalUrl);
+  logger.error(`Error 404: ${response.req.originalUrl}`);
 
   response.status(404)
     .json({
