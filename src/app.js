@@ -1,6 +1,5 @@
 const express = require('express');
 const createError = require('http-errors');
-const { join } = require('path');
 const cors = require('cors');
 const onFinished = require('on-finished');
 
@@ -21,10 +20,6 @@ require('./db')(app);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors());
-app.use(express.static(join(__dirname, '..', '..', 'public')));
-if (app.get('env') === 'development') {
-  app.use(express.static(join(__dirname, '..', '..', 'statics')));
-}
 
 app.use(function (request, response, next) {
   const ping = Date.now();
@@ -61,6 +56,8 @@ app.use(function (req, res, next) {
 // error handler
 // noinspection JSUnusedLocalSymbols
 app.use(function (err, req, res, next) {
+  logger.error({error: err, user: req.user});
+
   // generate the error
   res.status(err.status || 500);
   const error = {};

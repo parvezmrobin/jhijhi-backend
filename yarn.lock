@@ -182,6 +182,11 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.5.tgz#66103d2eddc543d44a04394abb7be52506d7f290"
   integrity sha512-KEjODidV4XYUlJBF3XdjSH5FWoMCtO0utnhtdLf1AgeuZLOrRbvmU/gaRCVg7ZaQDjVf3l84egiY0mRNe5xE4A==
 
+"@types/node@^10.0.0":
+  version "10.17.16"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-10.17.16.tgz#ee96ddac1a38d98d2c8a71c7df0cdad5758e8993"
+  integrity sha512-A4283YSA1OmnIivcpy/4nN86YlnKRiQp8PYwI2KdPCONEBN093QTb0gCtERtkLyVNGKKIGazTZ2nAmVzQU51zA==
+
 "@types/passport@^0.4.0":
   version "0.4.7"
   resolved "https://registry.yarnpkg.com/@types/passport/-/passport-0.4.7.tgz#2b7f29bf61df91cf77023b3777e940b613d4b4d8"
