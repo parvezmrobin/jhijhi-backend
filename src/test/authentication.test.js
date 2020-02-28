@@ -2,11 +2,11 @@ const { describe } = require('mocha');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 chai.should();
+process.env.IS_TEST = true;
 const app = require('../app');
 const User = require('../models/user');
 
 chai.use(chaiHttp);
-process.env.IS_TEST = true;
 
 describe('Test JWT authentication', function testSuit() {
   let token;
