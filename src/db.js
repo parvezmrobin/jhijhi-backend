@@ -15,7 +15,10 @@ const MongoStore = connectMongo(session);
 module.exports = function (app) {
   /* eslint-disable promise/always-return */
   return mongoose
-    .connect(process.env.DB_CONN, { useNewUrlParser: true, useFindAndModify: false, useUnifiedTopology: true })
+    .connect(
+      process.env.IS_TEST ? process.env.TEST_DB_CONN : process.env.DB_CONN,
+      { useNewUrlParser: true, useFindAndModify: false, useUnifiedTopology: true },
+    )
     .then(() => {
       logger.info(`Connected to database: '${mongoose.connection.db.databaseName}'`);
 
