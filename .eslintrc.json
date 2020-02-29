@@ -9,6 +9,8 @@
     "no-console": "warn",
     "prefer-const": "warn",
     "prefer-template": "error",
+    "max-len": ["warn", 120],
+    "semi": "error",
     "comma-dangle": ["warn", "always-multiline"]
   }
 }

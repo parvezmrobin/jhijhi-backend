@@ -41,6 +41,10 @@ module.exports = {
       ok: (name) => `Successfully edited player ${name}`,
       err: "Error while editing player",
     },
+    delete: {
+      ok: (name) => `Successfully deleted player ${name}`,
+      err: "Error while deleting player",
+    },
   },
   teams: {
     index: {

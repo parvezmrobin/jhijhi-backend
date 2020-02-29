@@ -86,7 +86,7 @@ describe('Test Player Functionality', function playerTestSuit() {
         name: 'player',
         jerseyNo: 1,
       });
-    res.should.have.status(200);
+    res.should.have.status(201);
     const player = res.body.player;
     player.name.should.be.equals('Player'); // name is auto-capitalized
     player.jerseyNo.should.be.equals(1);
@@ -176,6 +176,30 @@ describe('Test Player Functionality', function playerTestSuit() {
       name: 'player3',
       jerseyNo: 3,
     });
+  });
+
+  it('should not delete player of another user', async function () {
+    const res = await chai.request(app)
+      .delete(`/api/players/${playerId}`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send();
+    res.should.have.status(404);
+  });
+
+  it('should not delete with invalid mongo id', async function () {
+    const res = await chai.request(app)
+      .delete(`/api/players/abc`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send();
+    res.should.have.status(400);
+  });
+
+  it('should delete a player', async function () {
+    const res = await chai.request(app)
+      .delete(`/api/players/${playerId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send();
+    res.should.have.status(200);
   });
 
   after(async function () {

@@ -8,6 +8,7 @@ const { check, validationResult } = require('express-validator/check');
 const ObjectId = require('mongoose/lib/types/objectid');
 const { send404Response } = require('../lib/utils');
 const { namify, sendErrorResponse } = require('../lib/utils');
+const {Error400, Error404} = require('../lib/errors');
 
 /** @type {RequestHandler} */
 const authenticateJwt = passport.authenticate.bind(passport, 'jwt', { session: false });
@@ -41,7 +42,11 @@ const playerCreateValidations = [
       .then(player => !player)),
 ];
 
+const validMongoIdValidation = check('id', 'Must be a valid id')
+  .isMongoId();
+
 const playerEditValidations = [
+  validMongoIdValidation,
   nameExistsValidation,
   jerseyNoInRangeValidation,
   check('name', 'Player Name already taken')
@@ -63,32 +68,13 @@ const playerEditValidations = [
       .exec()
       .then(player => !(player && player._id.toString() !== req.params.id))),
 ];
-
 const playerGetValidations = [
-  check('id', 'Must be a valid id')
-    .isMongoId(),
+  validMongoIdValidation,
 ];
 
-/* GET players listing. */
-router.get('/', authenticateJwt(), (request, response) => {
-  let query;
-  if (request.query.search) {
-    const regExp = new RegExp(request.query.search, 'i');
-    query = Player.aggregate()
-      .match({ creator: request.user._id })
-      .addFields({ jerseyString: { $toLower: '$jerseyNo' } })
-      .match({ $or: [{ name: regExp }, { jerseyString: regExp }] })
-      .exec();
-  } else {
-    query = Player.find({ creator: request.user._id })
-      .lean()
-      .exec();
-  }
-
-  query
-    .then(players => response.json(players))
-    .catch(err => sendErrorResponse(response, err, responses.players.index.err));
-});
+const playerDeleteValidations = [
+  validMongoIdValidation,
+];
 
 /**
  * Get run, numBowl and strikeRate of a particular innings
@@ -196,8 +182,29 @@ function _getBowlingCareerStat(bowlingInningsStats) {
   };
 }
 
+/* GET players listing. */
+router.get('/', authenticateJwt(), (request, response) => {
+  let query;
+  if (request.query.search) {
+    const regExp = new RegExp(request.query.search, 'i');
+    query = Player.aggregate()
+      .match({ creator: request.user._id, isDeleted: false })
+      .addFields({ jerseyString: { $toLower: '$jerseyNo' } })
+      .match({ $or: [{ name: regExp }, { jerseyString: regExp }] })
+      .exec();
+  } else {
+    query = Player.find({ creator: request.user._id, isDeleted: false })
+      .lean()
+      .exec();
+  }
+
+  query
+    .then(players => response.json(players))
+    .catch(err => sendErrorResponse(response, err, responses.players.index.err));
+});
+
 /* GET stat of a player */
-router.get('/:id', authenticateJwt(), playerGetValidations, (request, response) => {
+router.get('/:id', [authenticateJwt(), playerGetValidations], (request, response) => {
   const playerId = request.params.id;
   let player;
   const cond = {
@@ -336,7 +343,7 @@ router.get('/:id', authenticateJwt(), playerGetValidations, (request, response) 
 });
 
 /* Create a new player */
-router.post('/', authenticateJwt(), playerCreateValidations, (request, response) => {
+router.post('/', [authenticateJwt(), playerCreateValidations], (request, response) => {
   const errors = validationResult(request);
   const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
     status: 400,
@@ -351,7 +358,7 @@ router.post('/', authenticateJwt(), playerCreateValidations, (request, response)
       creator: request.user._id,
     }))
     .then(createdPlayer => {
-      return response.json({
+      return response.status(201).json({
         success: true,
         message: responses.players.create.ok(name),
         player: {
@@ -365,7 +372,7 @@ router.post('/', authenticateJwt(), playerCreateValidations, (request, response)
 });
 
 /* Edit an existing player */
-router.put('/:id', authenticateJwt(), playerEditValidations, (request, response) => {
+router.put('/:id', [authenticateJwt(), playerEditValidations], (request, response) => {
   const errors = validationResult(request);
   const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
     status: 400,
@@ -400,6 +407,31 @@ router.put('/:id', authenticateJwt(), playerEditValidations, (request, response)
       });
     })
     .catch(err => sendErrorResponse(response, err, responses.players.edit.err));
+});
+
+router.delete('/:id', [authenticateJwt(), playerDeleteValidations], async (request, response) => {
+  const errors = validationResult(request);
+  try {
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array(), responses.players.delete.err);
+    }
+
+    const deletedPlayer = await Player.findOneAndUpdate({
+      _id: ObjectId(request.params.id),
+      creator: request.user._id,
+    }, {isDeleted: true});
+
+    if (!deletedPlayer) {
+      throw new Error404(responses.players.delete.err);
+    }
+
+    response.json({
+      success: true,
+      message: responses.players.delete.ok(deletedPlayer.name),
+    });
+  } catch (err) {
+    sendErrorResponse(response, err, responses.players.delete.err);
+  }
 });
 
 module.exports = router;

@@ -4,13 +4,29 @@
  * Date: Apr 10, 2019
  */
 
+class JhijhiError extends Error {
+  constructor(code, name, message) {
+    super();
+    this.jhijhi = true;
+    this.code = code;
+    this.status = code;
+    this.name = name;
+    this.message = message;
+  }
+}
 
-module.exports.Error400 = function (error) {
-  this.error = Array.isArray(error)? error: [error];
-  this.code = 400;
-};
+class Error400 extends JhijhiError {
+  constructor(error, message) {
+    super(400, 'Bad Request', message);
+    this.error = Array.isArray(error) ? error : [error];
+  }
+}
 
-module.exports.Error404 = function (error) {
-  this.error = Array.isArray(error)? error: [error];
-  this.code = 404;
-};
+class Error404 extends JhijhiError {
+  constructor(message) {
+    super(404, 'Not Found Request', message);
+  }
+}
+
+module.exports.Error400 = Error400;
+module.exports.Error404 = Error404;

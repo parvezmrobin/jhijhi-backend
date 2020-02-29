@@ -14,6 +14,10 @@ module.exports = new Schema({
     type: Number,
     min: 0,
   },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+  },
   creator: {
     type: Schema.Types.ObjectId,
     ref: 'User',
