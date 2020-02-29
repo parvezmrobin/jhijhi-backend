@@ -4,18 +4,18 @@ const Player = require('../models/player');
 const Match = require('../models/match');
 const responses = require('../responses');
 const passport = require('passport');
-const { check, validationResult } = require('express-validator/check');
+const {check, validationResult} = require('express-validator/check');
 const ObjectId = require('mongoose/lib/types/objectid');
-const { send404Response } = require('../lib/utils');
-const { namify, sendErrorResponse } = require('../lib/utils');
+const {send404Response} = require('../lib/utils');
+const {namify, sendErrorResponse} = require('../lib/utils');
 const {Error400, Error404} = require('../lib/errors');
 
 /** @type {RequestHandler} */
-const authenticateJwt = passport.authenticate.bind(passport, 'jwt', { session: false });
+const authenticateJwt = passport.authenticate.bind(passport, 'jwt', {session: false});
 
 const nameExistsValidation = check('name', 'Name should not be empty')
   .trim()
-  .exists({ checkFalsy: true });
+  .exists({checkFalsy: true});
 const jerseyNoInRangeValidation = check('jerseyNo', 'Jersey number should be between 0 to 999')
   .isInt({
     min: 0,
@@ -33,7 +33,7 @@ const playerCreateValidations = [
       .exec()
       .then(player => !player)),
   check('jerseyNo', 'This jersey is already taken')
-    .custom((jerseyNo, { req }) => Player
+    .custom((jerseyNo, {req}) => Player
       .findOne({
         jerseyNo: jerseyNo,
         creator: req.user._id,
@@ -50,7 +50,7 @@ const playerEditValidations = [
   nameExistsValidation,
   jerseyNoInRangeValidation,
   check('name', 'Player Name already taken')
-    .custom((name, { req }) => Player
+    .custom((name, {req}) => Player
       .findOne({
         name: namify(name),
         creator: req.user._id,
@@ -59,7 +59,7 @@ const playerEditValidations = [
       .exec()
       .then(player => !(player && player._id.toString() !== req.params.id))),
   check('jerseyNo')
-    .custom((jerseyNo, { req }) => Player
+    .custom((jerseyNo, {req}) => Player
       .findOne({
         jerseyNo: jerseyNo,
         creator: req.user._id,
@@ -79,35 +79,37 @@ const playerDeleteValidations = [
 /**
  * Get run, numBowl and strikeRate of a particular innings
  * @typedef {Array<{singles, boundary}>} Over
+ * @typedef {{run, numBowl, strikeRate}} BattingStat
  * @param {Array<Over>} battingInnings
- * @returns {run, numBowl, strikeRate}
+ * @returns {BattingStat[]}
  * @private
  */
 function _getBattingInningsStats(battingInnings) {
   return battingInnings.map(over => {
     const run = over.reduce((run, bowl) => {
       run += bowl.singles;
-      if (bowl.boundary.kind === 'regular' && Number.isInteger(bowl.boundary.run)) {
+      if (Number.isInteger(bowl.boundary.run)) {
         run += bowl.boundary.run;
       }
       return run;
     }, 0);
     const numBowl = over.length;
     const strikeRate = run / numBowl;
-    return {
-      run,
-      numBowl,
-      strikeRate,
-    };
+    return {run, numBowl, strikeRate};
   });
 }
 
 /**
- * Get run, wicket and totalBowl of all inningses
- * @typedef {{bowls: {Array}}} Over
+ * @typedef {{isWicket: IsWicket}} Bowl
+ * @typedef {{bowls: Array<Bowl>}} Over
  * @typedef {Array<Over>} Innings
+ * @typedef {{ run, wicket, totalBowl }} BowlingStat
+ */
+
+/**
+ * Get run, wicket and totalBowl of all inningses
  * @param {Array<Innings>} bowlingInningses
- * @returns {{ run, wicket, totalBowl }}
+ * @returns {BowlingStat[]}
  * @private
  */
 function _getBowlingInningsStats(bowlingInningses) {
@@ -147,7 +149,8 @@ function _getBattingCareerStat(battingInningsStats, numOuts) {
   const highestRun = battingInningsStats.reduce((hr, innings) => (hr > innings.run) ? hr : innings.run, 0);
   const totalRun = battingInningsStats.reduce((tr, innings) => tr + innings.run, 0);
   const avgRun = totalRun / numOuts;
-  const battingStrikeRate = battingInningsStats.reduce((sr, innings) => sr + innings.strikeRate, 0) / numInningsBatted * 100;
+  const sumOfBattingStrikeRate = battingInningsStats.reduce((sr, innings) => sr + innings.strikeRate, 0);
+  const battingStrikeRate = sumOfBattingStrikeRate / numInningsBatted * 100;
   return {
     numInningsBatted,
     highestRun,
@@ -188,12 +191,12 @@ router.get('/', authenticateJwt(), (request, response) => {
   if (request.query.search) {
     const regExp = new RegExp(request.query.search, 'i');
     query = Player.aggregate()
-      .match({ creator: request.user._id, isDeleted: false })
-      .addFields({ jerseyString: { $toLower: '$jerseyNo' } })
-      .match({ $or: [{ name: regExp }, { jerseyString: regExp }] })
+      .match({creator: request.user._id, isDeleted: false})
+      .addFields({jerseyString: {$toLower: '$jerseyNo'}})
+      .match({$or: [{name: regExp}, {jerseyString: regExp}]})
       .exec();
   } else {
-    query = Player.find({ creator: request.user._id, isDeleted: false })
+    query = Player.find({creator: request.user._id, isDeleted: false})
       .lean()
       .exec();
   }
@@ -204,171 +207,169 @@ router.get('/', authenticateJwt(), (request, response) => {
 });
 
 /* GET stat of a player */
-router.get('/:id', [authenticateJwt(), playerGetValidations], (request, response) => {
-  const playerId = request.params.id;
-  let player;
-  const cond = {
-    $and: [
-      {
-        $or: [
-          { team1Players: playerId },
-          { team2Players: playerId },
-        ],
-      },
-      { state: 'done' },
-      { creator: request.user._id },
-    ],
-  };
-  Promise.all([
-    Match.find(cond)
-      .lean()
-      .exec(),
-    Player.findById(playerId)
-      .lean()
-      .exec(),
-  ])
-  // get the innings in which player with `playerId` has played
-    .then(([matches, _player]) => {
-      player = _player;
-      return matches.map(match => {
-        const team1Index = match.team1Players.map(playerId => playerId.toString())
-          .indexOf(playerId);
-        if (team1Index !== -1) {
-          const [battingInnings, bowlingInnings] = match.team1BatFirst
-            ? [match.innings1, match.innings2]
-            : [match.innings2, match.innings1];
-          return {
-            battingInnings,
-            bowlingInnings,
-            playerIndex: team1Index,
-          };
-        } else {
-          const team2Index = match.team2Players.map(playerId => playerId.toString())
-            .indexOf(playerId);
-          if (team2Index === -1) {
-            throw new Error('Error in player stat query');
-          }
-          const [battingInnings, bowlingInnings] = match.team1BatFirst
-            ? [match.innings2, match.innings1]
-            : [match.innings1, match.innings2];
-          return {
-            battingInnings,
-            bowlingInnings,
-            playerIndex: team1Index,
-          };
-        }
-      });
-    })
-    // get the bowls of inningses he/she played
-    .then(matches => {
-      let numOuts = 0;
-      const matchWiseBattedBowls = matches.map((match) => {
-        return match.battingInnings.overs.reduce((bowls, over) => {
-          const filteredBowls = over.bowls.filter(bowl => bowl.playedBy === match.playerIndex);
-
-          // `numOuts` needed to be calculated here
-          // because a player can be out in a bowl he/she didn't played
-          const isOut = over.bowls.find(bowl => {
-            return bowl.isWicket && Number.isInteger(bowl.isWicket.player) && (bowl.isWicket.player === match.playerIndex);
-          });
-          if (isOut) {
-            numOuts++;
-          } else if (filteredBowls.find(bowl => bowl.isWicket && !Number.isInteger(bowl.isWicket.player))) {
-            // it is a bowl where only on-crease batsman can get out
-            numOuts++;
-          }
-
-          bowls.push(...filteredBowls);
-          return bowls;
-        }, []);
-      });
-      const matchWiseBowledOvers = matches.map(match => {
-        return match.bowlingInnings.overs.filter(over => over.bowledBy === match.playerIndex);
-      });
-      return {
-        numOuts,
-        matchWiseBattedBowls,
-        matchWiseBowledOvers,
-      };
-    })
-    // calculate stat of each innings
-    .then(({ numOuts, matchWiseBattedBowls, matchWiseBowledOvers }) => {
-      // filter battingInningses whether he/she played
-      const battingInningses = matchWiseBattedBowls.filter(innings => innings.length);
-      const battingInningsStats = _getBattingInningsStats(battingInningses);
-
-      const bowlingInningses = matchWiseBowledOvers.filter(innings => innings.length);
-      const bowlingInningsStats = _getBowlingInningsStats(bowlingInningses);
-
-      return {
-        numMatch: matchWiseBattedBowls.length, // same as `matchWiseBowledOvers.length`
-        numOuts,
-        battingInningsStats,
-        bowlingInningsStats,
-      };
-    })
-    // generate the stat
-    .then(({ numMatch, numOuts, battingInningsStats, bowlingInningsStats }) => {
-      const { numInningsBatted, highestRun, totalRun, avgRun, battingStrikeRate } = _getBattingCareerStat(battingInningsStats, numOuts);
-
-      const { numInningsBowled, bestFigure, totalWickets, avgWicket, bowlingStrikeRate } = _getBowlingCareerStat(bowlingInningsStats);
-
-      return response.json({
-        success: true,
-        message: responses.players.stat.ok(player.name),
-        stat: {
-          numMatch,
-          bat: {
-            numInnings: numInningsBatted,
-            totalRun,
-            avgRun,
-            highestRun,
-            strikeRate: battingStrikeRate,
-          },
-          bowl: {
-            numInnings: numInningsBowled,
-            totalWickets,
-            avgWicket,
-            bestFigure: {
-              wicket: bestFigure[0],
-              run: bestFigure[1],
-            },
-            strikeRate: bowlingStrikeRate,
-          },
+router.get('/:id', [authenticateJwt(), playerGetValidations], async (request, response) => {
+  try {
+    const playerId = request.params.id;
+    const cond = {
+      $and: [
+        {
+          $or: [
+            {team1Players: playerId},
+            {team2Players: playerId},
+          ],
         },
-        player,
-      });
-    })
-    .catch(err => sendErrorResponse(response, err, responses.players.create.err));
+        {state: 'done'},
+        {creator: request.user._id},
+      ],
+    };
+
+    const [matchesOfPlayer, player] = await Promise.all([
+      Match.find(cond)
+        .lean()
+        .exec(),
+      Player.findById(playerId)
+        .lean()
+        .exec(),
+    ]);
+
+    // get the innings in which player with `playerId` has contributed (batted or bowled)
+    const matchesOfContribution = matchesOfPlayer.map(match => {
+      const team1Index = match.team1Players.map(playerId => playerId.toString())
+        .indexOf(playerId);
+      if (team1Index !== -1) {
+        const [battingInnings, bowlingInnings] = match.team1BatFirst
+          ? [match.innings1, match.innings2]
+          : [match.innings2, match.innings1];
+        return {
+          battingInnings,
+          bowlingInnings,
+          playerIndex: team1Index,
+        };
+      } else {
+        const team2Index = match.team2Players.map(playerId => playerId.toString())
+          .indexOf(playerId);
+        if (team2Index === -1) {
+          throw new Error('Error in player stat query');
+        }
+        const [battingInnings, bowlingInnings] = match.team1BatFirst
+          ? [match.innings2, match.innings1]
+          : [match.innings1, match.innings2];
+        return {
+          battingInnings,
+          bowlingInnings,
+          playerIndex: team1Index,
+        };
+      }
+    });
+
+    // get the bowls of inningses he/she played
+    let numOuts = 0;
+    const matchWiseBattedBowls = matchesOfContribution.map((match) => {
+      return match.battingInnings.overs.reduce((bowls, over) => {
+        const onCreaseBowls = over.bowls.filter(bowl => bowl.playedBy === match.playerIndex);
+
+        /** @typedef {{kind: string, player: number}|undefined} IsWicket */
+
+        /** @type (IsWicket) => Boolean */
+        const outFilter = ({isWicket}) => isWicket && Number.isInteger(isWicket.player)
+          && (isWicket.player === match.playerIndex);
+        // `numOuts` needed to be calculated here
+        // because a player can be out in a bowl he/she didn't played
+        const isOut = over.bowls.find(outFilter);
+        if (isOut) {
+          numOuts++;
+        } else { // check if it is a bowl where only on-crease batsman can get out
+          /** @type (IsWicket) => Boolean */
+          const onCreaseOutOnlyFilter = ({isWicket}) => isWicket && !Number.isInteger(isWicket.player);
+          if (onCreaseBowls.find(onCreaseOutOnlyFilter)) {
+            numOuts++;
+          }
+        }
+
+        bowls.push(...onCreaseBowls);
+        return bowls;
+      }, []);
+    });
+    const matchWiseBowledOvers = matches.map(match => {
+      return match.bowlingInnings.overs.filter(over => over.bowledBy === match.playerIndex);
+    });
+
+    // calculate stat of each innings
+    // filter battingInningses whether he/she played
+    const battingInningses = matchWiseBattedBowls.filter(innings => innings.length);
+    const battingInningsStats = _getBattingInningsStats(battingInningses);
+
+    const bowlingInningses = matchWiseBowledOvers.filter(innings => innings.length);
+    const bowlingInningsStats = _getBowlingInningsStats(bowlingInningses);
+    const numMatch = matchWiseBattedBowls.length; // same as `matchWiseBowledOvers.length`
+
+    const {
+      numInningsBatted, highestRun, totalRun, avgRun, battingStrikeRate,
+    } = _getBattingCareerStat(battingInningsStats, numOuts);
+
+    const {
+      numInningsBowled, bestFigure, totalWickets, avgWicket, bowlingStrikeRate,
+    } = _getBowlingCareerStat(bowlingInningsStats);
+
+    // generate the stat
+    response.json({
+      success: true,
+      message: responses.players.stat.ok(player.name),
+      stat: {
+        numMatch,
+        bat: {
+          numInnings: numInningsBatted,
+          totalRun,
+          avgRun,
+          highestRun,
+          strikeRate: battingStrikeRate,
+        },
+        bowl: {
+          numInnings: numInningsBowled,
+          totalWickets,
+          avgWicket,
+          bestFigure: {
+            wicket: bestFigure[0],
+            run: bestFigure[1],
+          },
+          strikeRate: bowlingStrikeRate,
+        },
+      },
+      player,
+    });
+  } catch (err) {
+    sendErrorResponse(response, err, responses.players.get.err);
+  }
 });
 
 /* Create a new player */
-router.post('/', [authenticateJwt(), playerCreateValidations], (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const { name, jerseyNo } = request.body;
+router.post('/', [authenticateJwt(), playerCreateValidations], async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array(), responses.players.create.err);
+    }
 
-  promise
-    .then(() => Player.create({
+    const {name, jerseyNo} = request.body;
+
+    const createdPlayer = await Player.create({
       name: namify(name),
       jerseyNo,
       creator: request.user._id,
-    }))
-    .then(createdPlayer => {
-      return response.status(201).json({
-        success: true,
-        message: responses.players.create.ok(name),
-        player: {
-          _id: createdPlayer._id,
-          name: createdPlayer.name,
-          jerseyNo: createdPlayer.jerseyNo,
-        },
-      });
-    })
-    .catch(err => sendErrorResponse(response, err, responses.players.create.err));
+    });
+
+    response.status(201).json({
+      success: true,
+      message: responses.players.create.ok(name),
+      player: {
+        _id: createdPlayer._id,
+        name: createdPlayer.name,
+        jerseyNo: createdPlayer.jerseyNo,
+      },
+    });
+  } catch (err) {
+    sendErrorResponse(response, err, responses.players.create.err);
+  }
 });
 
 /* Edit an existing player */
@@ -378,7 +379,7 @@ router.put('/:id', [authenticateJwt(), playerEditValidations], (request, respons
     status: 400,
     errors: errors.array(),
   });
-  const { name, jerseyNo } = request.body;
+  const {name, jerseyNo} = request.body;
 
   promise
     .then(() => {
@@ -390,7 +391,7 @@ router.put('/:id', [authenticateJwt(), playerEditValidations], (request, respons
           name: namify(name),
           jerseyNo,
           creator: request.user._id,
-        }, { new: true });
+        }, {new: true});
     })
     .then(editedPlayer => {
       if (!editedPlayer) {
