@@ -1,0 +1,11 @@
+version: '3.7'
+
+services:
+  jhijhi:
+    image: node:10.16
+    container_name: jhijhi-backend
+    network_mode: host
+    volumes:
+    - ./:/jhijhi
+    working_dir: /jhijhi
+    entrypoint: /bin/bash
