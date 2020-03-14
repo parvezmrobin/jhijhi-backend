@@ -8,6 +8,7 @@ const isMongoId = require('validator/lib/isMongoId');
 const ObjectId = require('mongoose/lib/types/objectid');
 const Match = require('../models/match');
 const Team = require('../models/team');
+const Umpire = require('../models/umpire');
 const responses = require('../responses');
 const {sendErrorResponse, send404Response, nullEmptyValues} = require('../lib/utils');
 const {Error400, Error404} = require('../lib/errors');
@@ -38,7 +39,7 @@ const team2ExistsValidation = check('team2', 'Select a team')
 const minimumOverValidation = check('overs', 'Overs must be greater than 0')
   .isInt({min: 1});
 const genUmpireValidation = (umpireNumber) => check(`umpire${umpireNumber}`)
-  .custom((umpire, {req}) => {
+  .custom(async (umpire, {req}) => {
     if (!umpire) {
       return true;
     }
@@ -54,7 +55,12 @@ const genUmpireValidation = (umpireNumber) => check(`umpire${umpireNumber}`)
       }
     }
 
-    return true;
+    const exists = await Umpire.exists({
+      _id: umpire,
+      creator: req.user._id,
+    });
+
+    return exists;
   });
 
 const matchCreateValidations = [

@@ -26,7 +26,8 @@ describe('Test Match Functionality', function matchTestSuit() {
   let teamIds2;
   let matchId1;
   let matchId2;
-  let umpireIds;
+  let umpireIds1;
+  let umpireIds2;
 
   before(async () => {
     await chai.request(app)
@@ -74,18 +75,21 @@ describe('Test Match Functionality', function matchTestSuit() {
     const playerCreateResponses = await Promise.all(playerCreatePromises); // creating players concurrently
     playerIds = playerCreateResponses.map((r) => r.body.player._id);
 
-    const umpireCreatePromises = [];
-    for (let i = 0; i < 3; i++) {
-      const playerCreatePromise = chai.request(app)
-        .post('/api/umpires')
-        .set('Authorization', `Bearer ${token1}`)
-        .send({name: `umpire ${i}`});
-      umpireCreatePromises.push(playerCreatePromise);
+    async function createUmpires(token) {
+      const umpireCreatePromises = [];
+      for (let i = 0; i < 3; i++) {
+        const playerCreatePromise = chai.request(app)
+          .post('/api/umpires')
+          .set('Authorization', `Bearer ${token}`)
+          .send({name: `umpire ${i}`});
+        umpireCreatePromises.push(playerCreatePromise);
+      }
+
+      const umpireCreateResponses = await Promise.all(umpireCreatePromises); // creating players concurrently
+      return umpireCreateResponses.map((r) => r.body.umpire._id);
     }
-
-    const umpireCreateResponses = await Promise.all(umpireCreatePromises); // creating players concurrently
-    umpireIds = umpireCreateResponses.map((r) => r.body.umpire._id);
-
+    umpireIds1 = await createUmpires(token1);
+    umpireIds2 = await createUmpires(token2);
 
     async function createTeams(token) {
       const teamCreatePromises1 = [];
@@ -162,9 +166,9 @@ describe('Test Match Functionality', function matchTestSuit() {
       name: 'match 1',
       team1: teamIds1[0],
       team2: teamIds1[1],
-      umpire1: umpireIds[0],
-      umpire2: umpireIds[1],
-      umpire3: umpireIds[2],
+      umpire1: umpireIds1[0],
+      umpire2: umpireIds1[1],
+      umpire3: umpireIds1[2],
       overs: 4,
     };
     for (let i = 0; i < 3; i++) {
@@ -218,9 +222,9 @@ describe('Test Match Functionality', function matchTestSuit() {
       name: 'match 2',
       team1: teamIds1[0],
       team2: teamIds1[1],
-      umpire1: umpireIds[0],
-      umpire2: umpireIds[1],
-      umpire3: umpireIds[2],
+      umpire1: umpireIds1[0],
+      umpire2: umpireIds1[1],
+      umpire3: umpireIds1[2],
       overs: 4,
     });
   });
@@ -230,9 +234,9 @@ describe('Test Match Functionality', function matchTestSuit() {
       name: 'match 3',
       team1: teamIds1[0],
       team2: teamIds1[1],
-      umpire1: umpireIds[0],
-      umpire2: umpireIds[1],
-      umpire3: umpireIds[2],
+      umpire1: umpireIds1[0],
+      umpire2: umpireIds1[1],
+      umpire3: umpireIds1[2],
       overs: 4,
       tags: ['abc', 'efg', 'hij'],
     });
@@ -276,6 +280,24 @@ describe('Test Match Functionality', function matchTestSuit() {
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('team1')
       .and.contain('team2');
+  });
+
+  it('should not create match with umpires of other user', async () => {
+    const res = await chai.request(app)
+      .post('/api/matches')
+      .set('Authorization', `Bearer ${token2}`)
+      .send({
+        name: 'match 2',
+        team1: teamIds2[0],
+        team2: teamIds2[1],
+        umpire1: umpireIds1[0],
+        umpire2: umpireIds1[1],
+        umpire3: umpireIds1[2],
+        overs: 4,
+      });
+
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.have.members(['umpire1', 'umpire2', 'umpire3']);
   });
 
   after(async () => {
