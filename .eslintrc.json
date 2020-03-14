@@ -1,9 +1,8 @@
 {
   "parser": "babel-eslint",
-  "extends": ["plugin:promise/recommended"],
+  "extends": ["airbnb-base", "plugin:promise/recommended"],
   "env": {
-    "node": true,
-    "mocha": true
+    "node": true
   },
   "rules": {
     "no-console": "warn",
