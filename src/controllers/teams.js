@@ -1,93 +1,86 @@
 const express = require('express');
+
 const router = express.Router();
-const Team = require('../models/team');
-const responses = require('../responses');
 const passport = require('passport');
 const ObjectId = require('mongoose/lib/types/objectid');
-const {check, validationResult} = require('express-validator/check');
-const {namify, sendErrorResponse, send404Response} = require('../lib/utils');
-const {Error400, Error404} = require('../lib/errors');
+const { check, validationResult } = require('express-validator/check');
+const responses = require('../responses');
+const Team = require('../models/team');
+const { namify, sendErrorResponse, send404Response } = require('../lib/utils');
+const { Error400, Error404 } = require('../lib/errors');
 
 /** @type {RequestHandler} */
-const authenticateJwt = passport.authenticate.bind(passport, 'jwt', {session: false});
+const authenticateJwt = passport.authenticate.bind(passport, 'jwt', { session: false });
 
-//region Validations
+// region Validations
 function _formatShortName(shortName) {
   return shortName.split(' ')
-    .filter(s => s)
+    .filter((s) => s)
     .join('')
     .toUpperCase();
 }
 
 const nameExistsValidation = check('name', 'Team name is required')
   .trim()
-  .exists({checkFalsy: true});
+  .exists({ checkFalsy: true });
 const shortNameLengthValidation = check('shortName', 'Short name should be at least 2 characters')
   .trim()
-  .isLength({min: 2});
+  .isLength({ min: 2 });
 
 const teamCreateValidations = [
   nameExistsValidation,
   shortNameLengthValidation,
   check('name', 'Team Name already taken')
-    .custom((name, {req}) => {
-      return Team
-        .findOne({
-          name: namify(name),
-          creator: req.user._id,
-        })
-        .exec()
-        .then(team => !team);
-    }),
+    .custom((name, { req }) => Team
+      .findOne({
+        name: namify(name),
+        creator: req.user._id,
+      })
+      .exec()
+      .then((team) => !team)),
   check('shortName', 'This short name is already taken')
-    .custom((shortName, {req}) => {
-      return Team
-        .findOne({
-          shortName: _formatShortName(shortName),
-          creator: req.user._id,
-        })
-        .exec()
-        .then(team => !team);
-    }),
+    .custom((shortName, { req }) => Team
+      .findOne({
+        shortName: _formatShortName(shortName),
+        creator: req.user._id,
+      })
+      .exec()
+      .then((team) => !team)),
 ];
 
 const teamUpdateValidations = [
   nameExistsValidation,
   shortNameLengthValidation,
   check('name', 'Team Name already taken')
-    .custom((name, {req}) => {
-      return Team
-        .findOne({
-          name: namify(name),
-          creator: req.user._id,
-        })
-        .exec()
-        .then(team => !(team && team._id.toString() !== req.params.id));
-    }),
+    .custom((name, { req }) => Team
+      .findOne({
+        name: namify(name),
+        creator: req.user._id,
+      })
+      .exec()
+      .then((team) => !(team && team._id.toString() !== req.params.id))),
   check('shortName', 'This short name is already taken')
-    .custom((shortName, {req}) => {
-      return Team
-        .findOne({
-          shortName: _formatShortName(shortName),
-          creator: req.user._id,
-        })
-        .exec()
-        .then(team => !(team && team._id.toString() !== req.params.id));
-    }),
+    .custom((shortName, { req }) => Team
+      .findOne({
+        shortName: _formatShortName(shortName),
+        creator: req.user._id,
+      })
+      .exec()
+      .then((team) => !(team && team._id.toString() !== req.params.id))),
 ];
 
 const presetNameExistsValidation = check('name', 'Preset name is required')
   .trim()
-  .exists({checkFalsy: true});
+  .exists({ checkFalsy: true });
 const presetLengthValidation = check('players', 'Preset must contain at least 2 players')
   .isArray()
-  .isLength({min: 2});
+  .isLength({ min: 2 });
 
 const presetCreateValidations = [
   presetNameExistsValidation,
   presetLengthValidation,
   check('name', 'Preset name already taken')
-    .custom(async (name, {req}) => {
+    .custom(async (name, { req }) => {
       const team = await Team
         .findOne({
           'presets.name': namify(name),
@@ -102,7 +95,7 @@ const presetCreateValidations = [
 
 const presetDeleteValidations = [
   check('presetId', responses.presets.get.err)
-    .custom(async (presetId, {req}) => {
+    .custom(async (presetId, { req }) => {
       const teamExists = await Team
         .exists({
           'presets._id': presetId,
@@ -113,9 +106,9 @@ const presetDeleteValidations = [
       return teamExists;
     }),
 ];
-//endregion
+// endregion
 
-//region Controllers
+// region Controllers
 /* Get team by id */
 router.get('/:id', authenticateJwt(), (request, response) => {
   Team
@@ -125,13 +118,13 @@ router.get('/:id', authenticateJwt(), (request, response) => {
     })
     .lean()
     .populate('players')
-    .then(teams => response.json(teams))
-    .catch(err => sendErrorResponse(response, err, responses.teams.index.err));
+    .then((teams) => response.json(teams))
+    .catch((err) => sendErrorResponse(response, err, responses.teams.index.err));
 });
 
 /* GET teams listing. */
 router.get('/', authenticateJwt(), (request, response) => {
-  let query = {creator: request.user._id};
+  let query = { creator: request.user._id };
   if (request.query.search) {
     const regex = new RegExp(request.query.search, 'i');
     query = {
@@ -139,8 +132,8 @@ router.get('/', authenticateJwt(), (request, response) => {
         query,
         {
           $or: [
-            {name: regex},
-            {shortName: regex},
+            { name: regex },
+            { shortName: regex },
           ],
         },
       ],
@@ -150,8 +143,8 @@ router.get('/', authenticateJwt(), (request, response) => {
   Team
     .find(query)
     .lean()
-    .then(teams => response.json(teams))
-    .catch(err => sendErrorResponse(response, err, responses.teams.index.err));
+    .then((teams) => response.json(teams))
+    .catch((err) => sendErrorResponse(response, err, responses.teams.index.err));
 });
 
 /* Create a new team */
@@ -161,7 +154,7 @@ router.post('/', authenticateJwt(), teamCreateValidations, (request, response) =
     status: 400,
     errors: errors.array(),
   });
-  const {name, shortName} = request.body;
+  const { name, shortName } = request.body;
 
   promise
     .then(() => Team.create({
@@ -169,14 +162,12 @@ router.post('/', authenticateJwt(), teamCreateValidations, (request, response) =
       shortName: _formatShortName(shortName),
       creator: request.user._id,
     }))
-    .then(createdTeam => {
-      return response.json({
-        success: true,
-        message: responses.teams.create.ok(createdTeam.name),
-        team: createdTeam,
-      });
-    })
-    .catch(err => sendErrorResponse(response, err, responses.teams.create.err, request.user));
+    .then((createdTeam) => response.json({
+      success: true,
+      message: responses.teams.create.ok(createdTeam.name),
+      team: createdTeam,
+    }))
+    .catch((err) => sendErrorResponse(response, err, responses.teams.create.err, request.user));
 });
 
 /* Edit an existing team */
@@ -186,21 +177,19 @@ router.put('/:id', authenticateJwt(), teamUpdateValidations, (request, response)
     status: 400,
     errors: errors.array(),
   });
-  const {name, shortName} = request.body;
+  const { name, shortName } = request.body;
 
   promise
-    .then(() => {
-      return Team
-        .findOneAndUpdate({
-          _id: ObjectId(request.params.id),
-          creator: request.user._id,
-        }, {
-          name: namify(name),
-          shortName: _formatShortName(shortName),
-          creator: request.user._id,
-        }, {new: true});
-    })
-    .then(updatedTeam => {
+    .then(() => Team
+      .findOneAndUpdate({
+        _id: ObjectId(request.params.id),
+        creator: request.user._id,
+      }, {
+        name: namify(name),
+        shortName: _formatShortName(shortName),
+        creator: request.user._id,
+      }, { new: true }))
+    .then((updatedTeam) => {
       if (!updatedTeam) {
         return send404Response(response, responses.teams.get.err);
       }
@@ -214,7 +203,7 @@ router.put('/:id', authenticateJwt(), teamUpdateValidations, (request, response)
         },
       });
     })
-    .catch(err => sendErrorResponse(response, err, responses.teams.edit.err, request.user));
+    .catch((err) => sendErrorResponse(response, err, responses.teams.edit.err, request.user));
 });
 
 router.get('/:id/presets', authenticateJwt(), async (req, res) => {
@@ -243,7 +232,7 @@ router.post('/:id/presets', [authenticateJwt(), presetCreateValidations], async 
       throw new Error400(errors.array(), responses.presets.create.err(req.body.name));
     }
 
-    const {name, players} = req.body;
+    const { name, players } = req.body;
 
     const updatedTeam = Team
       .findOneAndUpdate({
@@ -251,9 +240,9 @@ router.post('/:id/presets', [authenticateJwt(), presetCreateValidations], async 
         creator: req.user._id,
       }, {
         presets: {
-          $push: {name, players},
+          $push: { name, players },
         },
-      }, {new: true})
+      }, { new: true })
       .select('presets')
       .lean();
 
@@ -284,7 +273,7 @@ router.delete('/:id/presets/:presetId', [authenticateJwt(), presetDeleteValidati
         creator: req.user._id,
       }, {
         $pull: {
-          presets: {_id: req.params.presetId},
+          presets: { _id: req.params.presetId },
         },
       });
 
@@ -296,6 +285,6 @@ router.delete('/:id/presets/:presetId', [authenticateJwt(), presetDeleteValidati
     sendErrorResponse(res, err, responses.presets.create.err, req.user);
   }
 });
-//endregion
+// endregion
 
 module.exports = router;
