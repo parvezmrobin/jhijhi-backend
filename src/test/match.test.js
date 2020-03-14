@@ -300,6 +300,46 @@ describe('Test Match Functionality', function matchTestSuit() {
     res.body.err.map((e) => e.param).should.have.members(['umpire1', 'umpire2', 'umpire3']);
   });
 
+  it('should not get match list without authorization', async () => {
+    const res = await chai.request(app)
+      .get('/api/matches');
+    res.should.have.status(401);
+  });
+
+  it('should get matches of only authenticated user', async () => {
+    const res = await chai.request(app)
+      .get('/api/matches')
+      .set('Authorization', `Bearer ${token1}`);
+
+    res.should.have.status(200);
+    const matches = res.body;
+    matches.should.be.an('array').with.length(3);
+  });
+
+  it('should not get tag list without authentication', async () => {
+    const res = await chai.request(app)
+      .get('/api/matches/tags');
+    res.should.have.status(401);
+  });
+
+  it('should get tags of only authenticated user', async () => {
+    let res = await chai.request(app)
+      .get('/api/matches/tags')
+      .set('Authorization', `Bearer ${token1}`);
+
+    res.should.have.status(200);
+    let tags = res.body;
+    tags.should.be.an('array').with.length(3);
+
+    res = await chai.request(app)
+      .get('/api/matches/tags')
+      .set('Authorization', `Bearer ${token2}`);
+
+    res.should.have.status(200);
+    tags = res.body;
+    tags.should.be.an('array').with.length(0);
+  });
+
   after(async () => {
     await Match.deleteMany({});
     await Team.deleteMany({});

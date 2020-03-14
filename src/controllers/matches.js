@@ -707,7 +707,9 @@ router.get('/done', authenticateJwt(), (request, response) => {
     .catch((err) => sendErrorResponse(response, err, responses.matches.index.err, request.user));
 });
 
-/* GET tags listing. */
+/**
+ * GET tags listing.
+ */
 router.get('/tags', authenticateJwt(), (request, response) => {
   Match.aggregate()
     .match({creator: request.user._id})
@@ -726,7 +728,7 @@ router.get('/tags', authenticateJwt(), (request, response) => {
     })
     .exec()
     .then((aggregation) => {
-      const tags = !(aggregation && aggregation.length) ? {tags: []} : aggregation[0];
+      const tags = !aggregation || !aggregation.length ? {tags: []} : aggregation[0];
       return response.json(tags.tags);
     })
     .catch((err) => sendErrorResponse(response, err, responses.matches.tags.err, request.user));
@@ -744,6 +746,7 @@ router.get('/:id', (request, response) => {
     .lean()
     .exec()
     .then((match) => {
+      // eslint-disable-next-line no-param-reassign
       match.tags = match.tags || []; // put a default value if `tags` field is absent
       return match;
     })
@@ -751,7 +754,9 @@ router.get('/:id', (request, response) => {
     .catch((err) => sendErrorResponse(response, err, responses.matches.get.err, request.user));
 });
 
-/* GET matches listing. */
+/**
+ *  GET matches listing.
+ */
 router.get('/', authenticateJwt(), (request, response) => {
   const query = {
     creator: request.user._id,
