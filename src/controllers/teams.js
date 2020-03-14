@@ -162,7 +162,7 @@ router.post('/', authenticateJwt(), teamCreateValidations, (request, response) =
       shortName: _formatShortName(shortName),
       creator: request.user._id,
     }))
-    .then((createdTeam) => response.json({
+    .then((createdTeam) => response.status(201).json({
       success: true,
       message: responses.teams.create.ok(createdTeam.name),
       team: createdTeam,
