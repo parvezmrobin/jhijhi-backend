@@ -3,12 +3,6 @@
     "mocha": true
   },
   "rules": {
-    "no-console": "warn",
-    "no-plusplus": "off",
-    "no-underscore-dangle": "off",
-    "no-restricted-syntax": "off",
-    "no-await-in-loop": "off",
-    "object-curly-spacing": "off",
-    "guard-for-in": "off"
+    "no-console": "off"
   }
 }
