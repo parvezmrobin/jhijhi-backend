@@ -8,8 +8,8 @@
 module.exports = {
   auth: {
     register: {
-      ok: "Successfully registered as a new user.",
-      err: "Error while registering as a new user.",
+      ok: 'Successfully registered as a new user.',
+      err: 'Error while registering as a new user.',
     },
     login: {
       user: 'user not found with given username',
@@ -24,42 +24,42 @@ module.exports = {
   },
   players: {
     index: {
-      err: "Error while retrieving player list",
+      err: 'Error while retrieving player list',
     },
     get: {
       err: 'Player could not found',
     },
     stat: {
       ok: (name) => `Successfully generated stat for player ${name}`,
-      err: "Error while generating stat",
+      err: 'Error while generating stat',
     },
     create: {
       ok: (name) => `Successfully created player ${name}`,
-      err: "Error while creating player",
+      err: 'Error while creating player',
     },
     edit: {
       ok: (name) => `Successfully edited player ${name}`,
-      err: "Error while editing player",
+      err: 'Error while editing player',
     },
     delete: {
       ok: (name) => `Successfully deleted player ${name}`,
-      err: "Error while deleting player",
+      err: 'Error while deleting player',
     },
   },
   teams: {
     index: {
-      err: "Error while retrieving team list",
+      err: 'Error while retrieving team list',
     },
     get: {
       err: 'Team could not found',
     },
     create: {
       ok: (name) => `Successfully created team ${name}`,
-      err: "Error while creating team",
+      err: 'Error while creating team',
     },
     edit: {
       ok: (name) => `Successfully edited team ${name}`,
-      err: "Error while editing team",
+      err: 'Error while editing team',
     },
   },
   presets: {
@@ -80,43 +80,43 @@ module.exports = {
   },
   matches: {
     index: {
-      err: "Error while retrieving match list",
+      err: 'Error while retrieving match list',
     },
     create: {
       ok: (name) => `Successfully created match ${name}`,
-      err: "Error while creating match",
+      err: 'Error while creating match',
     },
     edit: {
       ok: (name) => `Successfully edited match ${name}`,
-      err: "Error while editing match",
+      err: 'Error while editing match',
     },
     begin: {
-      ok: `Successfully started match`,
-      err: "Error while starting match",
+      ok: 'Successfully started match',
+      err: 'Error while starting match',
     },
     toss: {
-      ok: `Successfully tossed match`,
-      err: "Error while tossing match",
+      ok: 'Successfully tossed match',
+      err: 'Error while tossing match',
     },
     get: {
-      err: "Error while retrieving match",
+      err: 'Error while retrieving match',
     },
     tags: {
-      err: "Error while retrieving tags",
+      err: 'Error while retrieving tags',
     },
-    e404: "Could not find a match with given id",
+    e404: 'Could not find a match with given id',
   },
   umpires: {
     index: {
-      err: "Error while retrieving umpire list",
+      err: 'Error while retrieving umpire list',
     },
     create: {
       ok: (name) => `Successfully created umpire ${name}`,
-      err: "Error while creating umpire",
+      err: 'Error while creating umpire',
     },
     edit: {
       ok: (name) => `Successfully edited umpire ${name}`,
-      err: "Error while editing umpire",
+      err: 'Error while editing umpire',
     },
   },
 };

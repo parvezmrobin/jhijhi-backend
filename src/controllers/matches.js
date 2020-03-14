@@ -7,6 +7,7 @@ const pick = require('lodash/pick');
 const isMongoId = require('validator/lib/isMongoId');
 const ObjectId = require('mongoose/lib/types/objectid');
 const Match = require('../models/match');
+const Team = require('../models/team');
 const responses = require('../responses');
 const {sendErrorResponse, send404Response, nullEmptyValues} = require('../lib/utils');
 const {Error400, Error404} = require('../lib/errors');
@@ -23,38 +24,38 @@ const nameExistsValidation = check('name', 'A match name is required')
   .trim()
   .exists({checkFalsy: true});
 const team1ExistsValidation = check('team1', 'Select a team')
-  .isMongoId();
+  .isMongoId()
+  .custom(async (team1, {req}) => Team.exists({
+    _id: team1,
+    creator: req.user._id,
+  }));
 const team2ExistsValidation = check('team2', 'Select a team')
-  .isMongoId();
+  .isMongoId()
+  .custom(async (team2, {req}) => Team.exists({
+    _id: team2,
+    creator: req.user._id,
+  }));
 const minimumOverValidation = check('overs', 'Overs must be greater than 0')
-  .isInt({ min: 1 });
-const genUmpireValidation = (umpireNumber) => {
-  return check(`umpire${umpireNumber}`)
-    .custom((umpire, {req}) => {
-      if (!umpire) {
-        return true;
-      }
-      if (!isMongoId(umpire)) {
-        throw new Error(`Umpire ${umpireNumber} is invalid`);
-      }
-      for (let i = 1; i <= 3; i++) {
-        if (i === umpireNumber) {
-          continue;
-        }
-        if (umpire === req.body[`umpire${i}`]) {
-          throw new Error(`Umpire ${umpireNumber} is duplicate with umpire ${i}`);
-        }
-      }
-
+  .isInt({min: 1});
+const genUmpireValidation = (umpireNumber) => check(`umpire${umpireNumber}`)
+  .custom((umpire, {req}) => {
+    if (!umpire) {
       return true;
-    });
-};
-const getMatchByName = (name, creatorId) => Match
-  .findOne({
-    creator: creatorId,
-    name: new RegExp(name, 'i'),
-  })
-  .exec();
+    }
+    if (!isMongoId(umpire)) {
+      throw new Error(`Umpire ${umpireNumber} is invalid`);
+    }
+    for (let i = 1; i <= 3; i++) {
+      if (i === umpireNumber) {
+        continue;
+      }
+      if (umpire === req.body[`umpire${i}`]) {
+        throw new Error(`Umpire ${umpireNumber} is duplicate with umpire ${i}`);
+      }
+    }
+
+    return true;
+  });
 
 const matchCreateValidations = [
   nameExistsValidation,
@@ -65,8 +66,13 @@ const matchCreateValidations = [
   genUmpireValidation(3),
   minimumOverValidation,
   check('name', 'Match Name already taken')
-    .custom((name, {req}) => getMatchByName(namify(name), req.user._id)
-      .then((match) => !match)),
+    .custom(async (name, {req}) => {
+      const exists = await Match.exists({
+        name: new RegExp(namify(name), 'i'),
+        creator: req.user._id,
+      });
+      return !exists;
+    }),
   check('team1', 'Team 1 and Team 2 should be different.')
     .custom((team1, {req}) => team1 !== req.body.team2),
 ];
@@ -80,8 +86,14 @@ const matchEditValidations = [
   genUmpireValidation(3),
   minimumOverValidation,
   check('name', 'Match Name already taken')
-    .custom((name, {req}) => getMatchByName(name, req.user._id)
-      .then((match) => !(match && match._id.toString() !== req.params.id))),
+    .custom(async (name, {req}) => {
+      const exists = await Match.exists({
+        _id: {$ne: req.params.id},
+        name: new RegExp(namify(name), 'i'),
+        creator: req.user._id,
+      });
+      return !exists;
+    }),
   check('team1', 'Team 1 and Team 2 should be different.')
     .custom((team1, {req}) => team1 !== req.body.team2),
 ];
