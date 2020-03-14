@@ -51,7 +51,7 @@ module.exports = {
       err: "Error while retrieving team list",
     },
     get: {
-      err: 'Player could not found',
+      err: 'Team could not found',
     },
     create: {
       ok: (name) => `Successfully created team ${name}`,
@@ -60,6 +60,22 @@ module.exports = {
     edit: {
       ok: (name) => `Successfully edited team ${name}`,
       err: "Error while editing team",
+    },
+  },
+  presets: {
+    index: {
+      err: 'Error while retrieving preset list',
+    },
+    get: {
+      err: 'Preset could not found',
+    },
+    create: {
+      ok: (name) => `Successfully created preset ${name}`,
+      err: 'Error while creating preset',
+    },
+    delete: {
+      ok: 'Successfully deleted preset',
+      err: 'Error while deleting preset',
     },
   },
   matches: {
