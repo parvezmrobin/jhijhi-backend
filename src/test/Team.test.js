@@ -7,6 +7,7 @@ process.env.IS_TEST = true;
 const app = require('../app');
 const User = require('../models/user');
 const Team = require('../models/team');
+const Player = require('../models/player');
 const {namify} = require('../lib/utils');
 
 chai.use(chaiHttp);
@@ -32,7 +33,7 @@ describe('Test Team Functionality', function teamTestSuit() {
         password: '1234',
       });
     token1 = res.body.token;
-    console.log(token1);
+
   });
 
   it('should not create a team without authentication', async () => {
@@ -182,42 +183,38 @@ describe('Test Team Functionality', function teamTestSuit() {
       shortName: 'TEA3',
     });
   });
-  console.log(token1);
+
   it('should not create a preset without name', async () => {
     const res = await chai.request(app)
       .post(`/api/teams/${teamId}/presets`)
       .set('Authorization', `Bearer ${token1}`)
       .send({});
     res.should.have.status(400);
-    console.log(res.body);
+
     res.body.err.map((e) => e.param).should.contain('name')
       .and.contain('players');
   });
-  async function testCreatePlayer(token, playerName, jersyNo) {
-    console.log(token);
+  async function createPlayer(token, playerName, playerJerseyNo) {
     const res = await chai.request(app)
       .post('/api/players')
       .set('Authorization', `Bearer ${token}`)
       .send({
         name: playerName,
-        jerseyNo: jersyNo,
+        jerseyNo: playerJerseyNo,
       });
-    res.should.have.status(201);
+
     const {player} = res.body;
-    player.name.should.be.equals('Player'); // name is auto-capitalized
-    player.jerseyNo.should.be.equals(1);
-    player.should.have.property('_id');
     return player._id;
   }
   it('should not create a preset without min 2 players', async () => {
-    const player1 = await testCreatePlayer();
-    const player2 = await testCreatePlayer();
+    const player1 = await createPlayer(token1, 'player 1', 1);
+    const player2 = await createPlayer(token1, 'player 2', 2);
     let res = await chai.request(app)
       .post(`/api/teams/${teamId}/presets`)
       .set('Authorization', `Bearer ${token1}`)
       .send({name: 'team'});
     res.should.have.status(400);
-    console.log(res.body);
+
     res.body.err.map((e) => e.param).should.contain('players')
       .and.not.contain('name');
 
@@ -229,12 +226,14 @@ describe('Test Team Functionality', function teamTestSuit() {
         players: [player1],
       });
     res.should.have.status(400);
-    console.log(res.body);
+
     res.body.err.map((e) => e.param).should.contain('players')
       .and.not.contain('name');
   });
+
   after(async () => {
     await Team.deleteMany({});
+    await Player.deleteMany({});
     await User.deleteMany({});
   });
 });

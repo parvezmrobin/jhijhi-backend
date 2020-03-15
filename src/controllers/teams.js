@@ -74,7 +74,7 @@ const presetNameExistsValidation = check('name', 'Preset name is required')
   .exists({ checkFalsy: true });
 const presetLengthValidation = check('players', 'Preset must contain at least 2 players')
   .isArray()
-  .isLength({ min: 2 });
+  .custom((players) => players.length > 1);
 
 const presetCreateValidations = [
   presetNameExistsValidation,
@@ -229,12 +229,12 @@ router.post('/:id/presets', [authenticateJwt(), presetCreateValidations], async 
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      throw new Error400(errors.array(), responses.presets.create.err(req.body.name));
+      throw new Error400(errors.array(), responses.presets.create.err);
     }
 
     const { name, players } = req.body;
 
-    const updatedTeam = Team
+    const updatedTeam = await Team
       .findOneAndUpdate({
         _id: req.params.id,
         creator: req.user._id,
