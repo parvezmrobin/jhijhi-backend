@@ -26,8 +26,7 @@ describe('Test Match Functionality', function matchTestSuit() {
   let teamIds2;
   let matchId1;
   let matchId2;
-  let umpireIds1;
-  let umpireIds2;
+  let umpireIds;
 
   before(async () => {
     await chai.request(app)
@@ -61,7 +60,7 @@ describe('Test Match Functionality', function matchTestSuit() {
     token2 = loginRes.body.token;
 
     const playerCreatePromises = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const playerCreatePromise = chai.request(app)
         .post('/api/players')
         .set('Authorization', `Bearer ${token1}`)
@@ -88,8 +87,8 @@ describe('Test Match Functionality', function matchTestSuit() {
       const umpireCreateResponses = await Promise.all(umpireCreatePromises); // creating players concurrently
       return umpireCreateResponses.map((r) => r.body.umpire._id);
     }
-    umpireIds1 = await createUmpires(token1);
-    umpireIds2 = await createUmpires(token2);
+
+    umpireIds = await createUmpires(token1);
 
     async function createTeams(token) {
       const teamCreatePromises1 = [];
@@ -166,9 +165,9 @@ describe('Test Match Functionality', function matchTestSuit() {
       name: 'match 1',
       team1: teamIds1[0],
       team2: teamIds1[1],
-      umpire1: umpireIds1[0],
-      umpire2: umpireIds1[1],
-      umpire3: umpireIds1[2],
+      umpire1: umpireIds[0],
+      umpire2: umpireIds[1],
+      umpire3: umpireIds[2],
       overs: 4,
     };
     for (let i = 0; i < 3; i++) {
@@ -222,9 +221,9 @@ describe('Test Match Functionality', function matchTestSuit() {
       name: 'match 2',
       team1: teamIds1[0],
       team2: teamIds1[1],
-      umpire1: umpireIds1[0],
-      umpire2: umpireIds1[1],
-      umpire3: umpireIds1[2],
+      umpire1: umpireIds[0],
+      umpire2: umpireIds[1],
+      umpire3: umpireIds[2],
       overs: 4,
     });
   });
@@ -234,9 +233,9 @@ describe('Test Match Functionality', function matchTestSuit() {
       name: 'match 3',
       team1: teamIds1[0],
       team2: teamIds1[1],
-      umpire1: umpireIds1[0],
-      umpire2: umpireIds1[1],
-      umpire3: umpireIds1[2],
+      umpire1: umpireIds[0],
+      umpire2: umpireIds[1],
+      umpire3: umpireIds[2],
       overs: 4,
       tags: ['abc', 'efg', 'hij'],
     });
@@ -258,7 +257,7 @@ describe('Test Match Functionality', function matchTestSuit() {
   });
 
   it('should create match with same name but different user', async () => {
-    matchId1 = await testCreateMatch(token2, {
+    matchId2 = await testCreateMatch(token2, {
       name: 'match 1',
       team1: teamIds2[0],
       team2: teamIds2[1],
@@ -290,9 +289,9 @@ describe('Test Match Functionality', function matchTestSuit() {
         name: 'match 2',
         team1: teamIds2[0],
         team2: teamIds2[1],
-        umpire1: umpireIds1[0],
-        umpire2: umpireIds1[1],
-        umpire3: umpireIds1[2],
+        umpire1: umpireIds[0],
+        umpire2: umpireIds[1],
+        umpire3: umpireIds[2],
         overs: 4,
       });
 
@@ -329,7 +328,7 @@ describe('Test Match Functionality', function matchTestSuit() {
 
     res.should.have.status(200);
     let tags = res.body;
-    tags.should.be.an('array').with.length(3);
+    tags.should.be.an('array').with.ordered.members(['abc', 'efg', 'hij']);
 
     res = await chai.request(app)
       .get('/api/matches/tags')
@@ -338,6 +337,126 @@ describe('Test Match Functionality', function matchTestSuit() {
     res.should.have.status(200);
     tags = res.body;
     tags.should.be.an('array').with.length(0);
+  });
+
+  it('should not begin match without any required value', async () => {
+    const matchBeginPayload = {
+      team1Captain: playerIds[0],
+      team2Captain: playerIds[2],
+      team1Players: playerIds.slice(0, 2),
+      team2Players: playerIds.slice(2),
+    };
+
+    for (const key in matchBeginPayload) {
+      const payload = {...matchBeginPayload, [key]: null};
+      const res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/begin`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+
+      res.should.have.status(400);
+      res.body.err.map((e) => e.param).should.contain(key);
+    }
+  });
+
+  async function shouldHaveTeam1CaptainError(matchBeginPayload) {
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/begin`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(matchBeginPayload);
+
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.contain('team1Captain');
+  }
+
+  async function shouldHaveTeam2CaptainError(matchBeginPayload) {
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/begin`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(matchBeginPayload);
+
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.contain('team2Captain');
+  }
+
+  it('should not start match without sufficient player', async () => {
+    const matchBeginPayload = {
+      team1Captain: playerIds[0],
+      team2Captain: playerIds[4],
+      team1Players: playerIds.slice(0, 1),
+      team2Players: playerIds.slice(2),
+    };
+
+    // for front-end implementation, the error is passed for param `team1Captain` instead of `team1Players`
+    await shouldHaveTeam1CaptainError(matchBeginPayload);
+
+    matchBeginPayload.team1Players = playerIds.slice(0, 2);
+    matchBeginPayload.team2Players = playerIds.slice(5);
+    // for front-end implementation, the error is passed for param `team2Captain` instead of `team2Players`
+    await shouldHaveTeam2CaptainError(matchBeginPayload);
+  });
+
+  it('should not begin match with captain outside of team', async () => {
+    const matchBeginPayload = {
+      team1Captain: playerIds[0],
+      team2Captain: playerIds[4],
+      team1Players: playerIds.slice(1, 3),
+      team2Players: playerIds.slice(4, 6),
+    };
+    await shouldHaveTeam1CaptainError(matchBeginPayload);
+
+    matchBeginPayload.team2Captain = playerIds[3];
+    await shouldHaveTeam2CaptainError(matchBeginPayload);
+  });
+
+  it("should not start other user's match", async () => {
+    const matchBeginPayload = {
+      team1Captain: playerIds[0],
+      team2Captain: playerIds[3],
+      team1Players: playerIds.slice(0, 2),
+      team2Players: playerIds.slice(3),
+    };
+
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId2}/begin`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(matchBeginPayload);
+
+    res.should.have.status(404);
+  });
+
+  it('should not begin match with players of other user', async () => {
+    const matchBeginPayload = {
+      team1Captain: playerIds[0],
+      team2Captain: playerIds[3],
+      team1Players: playerIds.slice(0, 2),
+      team2Players: playerIds.slice(3),
+    };
+
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/begin`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(matchBeginPayload);
+
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.have.members(['team1Players', 'team2Players']);
+  });
+
+  it('should begin match', async () => {
+    const matchBeginPayload = {
+      team1Captain: playerIds[0],
+      team2Captain: playerIds[3],
+      team1Players: playerIds.slice(0, 2),
+      team2Players: playerIds.slice(3),
+    };
+
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/begin`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(matchBeginPayload);
+
+    res.should.have.status(200);
+    res.body.match.state.should.be.equal('toss');
   });
 
   after(async () => {

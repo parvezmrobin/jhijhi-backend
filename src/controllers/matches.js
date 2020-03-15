@@ -9,6 +9,7 @@ const ObjectId = require('mongoose/lib/types/objectid');
 const Match = require('../models/match');
 const Team = require('../models/team');
 const Umpire = require('../models/umpire');
+const Player = require('../models/player');
 const responses = require('../responses');
 const {sendErrorResponse, send404Response, nullEmptyValues} = require('../lib/utils');
 const {Error400, Error404} = require('../lib/errors');
@@ -104,11 +105,29 @@ const matchEditValidations = [
     .custom((team1, {req}) => team1 !== req.body.team2),
 ];
 
+const isRequiredMessageBuilder = (_, {path}) => `\`${path}\` is required`;
+const playerIdExistenceValidation = (field) => check(field)
+  .custom(async (playersIds, {req}) => {
+    const existencePromises = playersIds.map((playerId) => Player.exists({
+      _id: playerId,
+      creator: req.user._id,
+    }));
+
+    const existenceList = await Promise.all(existencePromises);
+    // list ids that don't exists
+    const nonExistingIds = playersIds.filter((_, i) => !existenceList[i]);
+    if (!nonExistingIds.length) {
+      return true;
+    }
+    throw new Error(`${nonExistingIds.join(', ')} don't exists`);
+  });
 const matchBeginValidations = [
-  check('team1Players')
+  check('team1Players', isRequiredMessageBuilder)
     .isArray(),
-  check('team2Players')
+  playerIdExistenceValidation('team1Players'),
+  check('team2Players', isRequiredMessageBuilder)
     .isArray(),
+  playerIdExistenceValidation('team2Players'),
   check('team1Captain', 'No captain selected')
     .isMongoId(),
   check('team1Captain', 'Must have at least two players')
@@ -285,68 +304,66 @@ const bowlValidations = [
     .isString(),
 ];
 
-router.put('/:id/begin', authenticateJwt(), matchBeginValidations, (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const params = nullEmptyValues(request);
-  const {
-    team1Players, team1Captain, team2Players, team2Captain, state = 'toss',
-  } = params;
-  const {id} = request.params;
+router.put('/:id/begin', authenticateJwt(), matchBeginValidations, async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+    const params = nullEmptyValues(request);
+    const {
+      team1Players, team1Captain, team2Players, team2Captain, state = 'toss',
+    } = params;
+    const {id} = request.params;
 
-  promise
-    .then(() => Match
+    const match = await Match
       .findOne({
         _id: id,
         creator: request.user._id,
       })
-      .exec())
-    .then((match) => {
-      if (!match) {
-        return send404Response(response, responses.matches.e404);
-      }
+      .exec();
 
-      match.set({
-        team1Captain,
-        team2Captain,
-        team1Players,
-        team2Players,
-        state,
-      });
+    if (!match) {
+      send404Response(response, responses.matches.e404);
+      return;
+    }
 
-      return match.save();
-    })
-    .then((match) => match.populate('team1Captain')
+    match.set({
+      team1Captain,
+      team2Captain,
+      team1Players,
+      team2Players,
+      state,
+    });
+
+    await match.save();
+    await match.populate('team1Captain')
       .populate('team2Captain')
       .populate('team1Players')
       .populate('team2Players')
-      .execPopulate())
-    .then((match) => {
-      Logger.amplitude(Events.Match.Begin, request.user._id, {
-        match_id: match._id,
-        team1Captain,
-        team2Captain,
-        team1Players,
-        team2Players,
-        state,
-      });
-
-      return response.json({
-        success: true,
-        message: responses.matches.begin.ok,
-        match: {
-          team1Captain: match.team1Captain,
-          team2Captain: match.team2Captain,
-          team1Players: match.team1Players,
-          team2Players: match.team2Players,
-          state: 'toss',
-        },
-      });
-    })
-    .catch((err) => sendErrorResponse(response, err, responses.matches.begin.err, request.user));
+      .execPopulate();
+    Logger.amplitude(Events.Match.Begin, request.user._id, {
+      match_id: match._id,
+      team1Captain,
+      team2Captain,
+      team1Players,
+      team2Players,
+      state,
+    });
+    response.json({
+      success: true,
+      message: responses.matches.begin.ok,
+      match: {
+        team1Captain: match.team1Captain,
+        team2Captain: match.team2Captain,
+        team1Players: match.team1Players,
+        team2Players: match.team2Players,
+        state: 'toss',
+      },
+    });
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.begin.err, request.user);
+  }
 });
 
 router.put('/:id/toss', authenticateJwt(), matchTossValidations, (request, response) => {
