@@ -92,7 +92,7 @@ describe('Test Match Functionality', function matchTestSuit() {
 
     async function createTeams(token) {
       const teamCreatePromises1 = [];
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < 3; i++) {
         const teamCreatePromise = chai.request(app)
           .post('/api/teams')
           .set('Authorization', `Bearer ${token}`)
@@ -457,6 +457,88 @@ describe('Test Match Functionality', function matchTestSuit() {
 
     res.should.have.status(200);
     res.body.match.state.should.be.equal('toss');
+  });
+
+  it('should not toss a match of other user', async () => {
+    const tossPayload = {
+      won: teamIds1[0],
+      choice: 'Bat',
+    };
+
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/toss`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(tossPayload);
+
+    res.should.have.status(404);
+  });
+
+  it('should not toss a match with invalid value', async () => {
+    const tossPayload = {
+      won: teamIds1[0],
+      choice: 'Bat',
+    };
+
+    for (const key in tossPayload) {
+      const dumpedPayload = {...tossPayload, [key]: null};
+
+      const res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/toss`)
+        .set('Authorization', `Bearer ${token2}`)
+        .send(dumpedPayload);
+
+      res.should.have.status(400);
+      res.body.err.map((e) => e.param).should.have.members([key]);
+    }
+
+    let res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/toss`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({...tossPayload, won: teamIds1[2]});
+
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.have.members(['won']);
+
+    res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/toss`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({...tossPayload, choice: 'None'});
+
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.have.members(['choice']);
+  });
+
+  it('should toss a match', async () => {
+    const tossPayload = {
+      won: teamIds1[0],
+      choice: 'Bowl',
+    };
+
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/toss`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(tossPayload);
+
+    res.should.have.status(200);
+    const {match} = res.body;
+    match.team1WonToss.should.be.true;
+    match.team1BatFirst.should.be.false;
+    match.state.should.be.equals('innings1');
+    match.innings1.should.have.property('overs').that.is.an('array').with.length(0);
+  });
+
+  it('should not toss an already tossed match', async () => {
+    const tossPayload = {
+      won: teamIds1[0],
+      choice: 'Bowl',
+    };
+
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/toss`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(tossPayload);
+
+    res.should.have.status(404);
   });
 
   after(async () => {

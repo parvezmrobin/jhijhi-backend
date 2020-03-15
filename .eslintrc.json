@@ -16,6 +16,7 @@
     "no-continue": "off",
     "object-curly-spacing": "off",
     "no-prototype-builtins": "off",
+    "no-unused-expressions": "off",
     "prefer-destructuring": ["error", {
       "array": false,
       "object": true

@@ -154,13 +154,13 @@ const matchTossValidations = [
       .findById(req.params.id)
       .exec()
       .then((match) => {
-        if (!(won === match.team1.toString() || won === match.team2.toString())) {
+        if (![match.team1, match.team2].map(String).includes(won)) {
           throw new Error('Select a team');
         }
         return true;
       })),
   check('choice')
-    .isIn(['Bat', 'Bawl']),
+    .isIn(['Bat', 'Bowl']),
 ];
 
 const uncertainOutValidations = [
@@ -366,51 +366,51 @@ router.put('/:id/begin', authenticateJwt(), matchBeginValidations, async (reques
   }
 });
 
-router.put('/:id/toss', authenticateJwt(), matchTossValidations, (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const params = nullEmptyValues(request);
+router.put('/:id/toss', [authenticateJwt(), matchTossValidations], async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+    const params = nullEmptyValues(request);
 
-  const {won, choice, state = 'innings1'} = params;
-  const {id} = request.params;
+    const {won, choice, state = 'innings1'} = params;
+    const {id} = request.params;
 
-  promise
-    .then(() => Match
+    const match = await Match
       .findOne({
         _id: id,
         creator: request.user._id,
-      })
-      .exec())
-    .then((match) => {
-      if (!match) {
-        throw new Error404(responses.matches.e404);
-      }
-      match.team1WonToss = match.team1.toString() === won;
-      match.team1BatFirst = (match.team1WonToss && choice === 'Bat') || (!match.team1WonToss && choice === 'Bawl');
-      match.state = state;
-      match.innings1 = {overs: []};
-      return match.save();
-    })
-    .then((match) => {
-      const amplitudeEvent = pick(match.toObject(), ['team1WonToss', 'team1BatFirst', 'state']);
-      Object.assign(amplitudeEvent, {won, choice, state});
-      Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
-
-      return response.json({
-        success: true,
-        message: responses.matches.toss.ok,
-        match: {
-          team1WonToss: match.team1WonToss,
-          team1BatFirst: match.team1BatFirst,
-          state: 'innings1',
-          innings1: {overs: []},
-        },
+        state: 'toss',
       });
-    })
-    .catch((err) => sendErrorResponse(response, err, responses.matches.toss.err, request.user));
+
+    if (!match) {
+      throw new Error404(responses.matches.e404);
+    }
+
+    match.team1WonToss = match.team1.toString() === won;
+    match.team1BatFirst = (match.team1WonToss && choice === 'Bat') || (!match.team1WonToss && choice === 'Bowl');
+    match.state = state;
+    match.innings1 = {overs: []};
+    await match.save();
+
+    const amplitudeEvent = pick(match.toObject(), ['team1WonToss', 'team1BatFirst', 'state']);
+    Object.assign(amplitudeEvent, {won, choice, state});
+    Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
+
+    response.json({
+      success: true,
+      message: responses.matches.toss.ok,
+      match: {
+        team1WonToss: match.team1WonToss,
+        team1BatFirst: match.team1BatFirst,
+        state: 'innings1',
+        innings1: {overs: []},
+      },
+    });
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.toss.err, request.user);
+  }
 });
 
 router.put('/:id/declare', authenticateJwt(), (request, response) => {
