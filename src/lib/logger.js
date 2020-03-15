@@ -5,7 +5,9 @@
  */
 
 const winston = require('winston');
-const { simple, colorize } = winston.format;
+require('winston-daily-rotate-file');
+
+const {simple, colorize} = winston.format;
 const axios = require('axios');
 
 const logger = winston.createLogger({
@@ -17,31 +19,44 @@ const logger = winston.createLogger({
     // - Write to all logs with level `warn` and below to `validation.log`
     // - Write all logs error (and below) to `error.log`.
     //
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/validation.log', level: 'warn' }),
-    new winston.transports.File({ filename: 'logs/combined.log' }),
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/%DATE%/error.log',
+      datePattern: 'YYYY-MM-DD',
+      level: 'error',
+    }),
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/%DATE%/validation.log',
+      datePattern: 'YYYY-MM-DD',
+      level: 'warn',
+    }),
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/%DATE%/combined.log',
+      datePattern: 'YYYY-MM-DD',
+    }),
   ],
 });
 
-//
 // If we're not in production then log to the `console` with the format:
 // `${info.level}: ${info.message} JSON.stringify({ ...rest }) `
-//
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
+  const consoleTransport = new winston.transports.Console({
     format: colorize({all: true}),
-  }));
+  });
+  logger.add(consoleTransport);
 }
 
-const amplitude = function (eventName, userId, data, time) {
+function amplitude(eventName, userId, data, time) {
+  // eslint-disable-next-line no-param-reassign
   time = Number(time || new Date());
   return axios
     .post('https://api.amplitude.com/2/httpapi', {
       api_key: process.env.AMPLITUDE_KEY,
-      events: [{event_type: eventName, user_id: userId, event_properties: data, time}],
+      events: [{
+        event_type: eventName, user_id: userId, event_properties: data, time,
+      }],
     })
-    .catch(err => logger.error('Error Amplitude:', {err: err.response && err.response.data}));
-};
+    .catch((err) => logger.error('Error Amplitude:', {err: err.response && err.response.data}));
+}
 
 module.exports = logger;
 module.exports.amplitude = amplitude;
