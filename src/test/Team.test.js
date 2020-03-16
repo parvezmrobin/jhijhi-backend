@@ -13,11 +13,27 @@ const {namify} = require('../lib/utils');
 chai.use(chaiHttp);
 
 describe('Test Team Functionality', function teamTestSuit() {
-  this.timeout(20000);
+  this.timeout(500000);
   let token1;
   let token2;
   let teamId;
+  let presetId;
+  let player1;
+  let player2;
+  let player3;
+  let player4;
 
+  async function createPlayer(token, playerName, playerJerseyNo) {
+    const res = await chai.request(app)
+      .post('/api/players')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: playerName,
+        jerseyNo: playerJerseyNo,
+      });
+    const {player} = res.body;
+    return player._id;
+  }
   before(async () => {
     await chai.request(app)
       .post('/api/auth/register')
@@ -33,7 +49,11 @@ describe('Test Team Functionality', function teamTestSuit() {
         password: '1234',
       });
     token1 = res.body.token;
-
+    token2 = res.body.token;
+    player1 = await createPlayer(token1, 'player 1', 1);
+    player2 = await createPlayer(token1, 'player 2', 2);
+    player3 = await createPlayer(token2, 'player 3', 3);
+    player4 = await createPlayer(token2, 'player 4', 4);
   });
 
   it('should not create a team without authentication', async () => {
@@ -194,21 +214,8 @@ describe('Test Team Functionality', function teamTestSuit() {
     res.body.err.map((e) => e.param).should.contain('name')
       .and.contain('players');
   });
-  async function createPlayer(token, playerName, playerJerseyNo) {
-    const res = await chai.request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: playerName,
-        jerseyNo: playerJerseyNo,
-      });
 
-    const {player} = res.body;
-    return player._id;
-  }
   it('should not create a preset without min 2 players', async () => {
-    const player1 = await createPlayer(token1, 'player 1', 1);
-    const player2 = await createPlayer(token1, 'player 2', 2);
     let res = await chai.request(app)
       .post(`/api/teams/${teamId}/presets`)
       .set('Authorization', `Bearer ${token1}`)
@@ -229,6 +236,48 @@ describe('Test Team Functionality', function teamTestSuit() {
 
     res.body.err.map((e) => e.param).should.contain('players')
       .and.not.contain('name');
+  });
+  async function testCreatePreset(token) {
+    const res = await chai.request(app)
+      .post(`/api/teams/${teamId}/presets`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'team',
+        players: [player1, player2],
+      });
+    res.should.have.status(201);
+    console.log(res.body);
+    const {preset} = res.body;
+    preset.name.should.be.equals('Team'); // name is auto-capitalized
+    preset.players[0].should.be.equals(player1); // short name is auto-capitalized
+    preset.players[1].should.be.equals(player2);
+    preset.should.have.property('_id');
+    return preset._id;
+  }
+  it('should successfully create a preset', async () => {
+    presetId = await testCreatePreset(token1);
+  });
+
+  it('should not create a preset of another user', async () => {
+    const res = await chai.request(app)
+      .post(`/api/teams/${teamId}/presets`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send({
+        name: 'team',
+        players: [player1, player2],
+      });
+    res.should.have.status(404);
+  });
+
+  it('should not insert players of another user into a preset', async () => {
+    const res = await chai.request(app)
+      .post(`/api/teams/${teamId}/presets`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({
+        name: 'team',
+        players: [player3, player4],
+      });
+    res.should.have.status(400);
   });
 
   after(async () => {

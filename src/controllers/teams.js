@@ -233,24 +233,22 @@ router.post('/:id/presets', [authenticateJwt(), presetCreateValidations], async 
     }
 
     const { name, players } = req.body;
-
     const updatedTeam = await Team
       .findOneAndUpdate({
         _id: req.params.id,
         creator: req.user._id,
       }, {
-        presets: {
-          $push: { name, players },
+        $push: {
+          presets: { name: namify(name), players },
         },
       }, { new: true })
       .select('presets')
       .lean();
-
+    console.log(updatedTeam);
     if (!updatedTeam) {
       throw new Error404(responses.teams.get.err);
     }
-
-    res.json({
+    res.status(201).json({
       success: true,
       message: responses.presets.create.ok(name),
       preset: updatedTeam.presets[updatedTeam.presets.length - 1],
