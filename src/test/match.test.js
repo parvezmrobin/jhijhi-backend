@@ -613,6 +613,107 @@ describe('Test Match Functionality', function matchTestSuit() {
     res.body.err[0].param.should.be.equals('playedBy');
   });
 
+  it('should not add bowl with invalid combination of values', async () => {
+    let payload = {
+      playedBy: 0,
+      singles: 'spd',
+    };
+    let errorParams;
+    const addBowl = async () => {
+      const res = await chai.request(app)
+        .post(`/api/matches/${matchId1}/bowl`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+      res.should.have.status(400);
+      return res.body.err.map((e) => e.param);
+    };
+
+    for (const singles of ['spd', -1]) {
+      payload.singles = singles;
+      errorParams = await addBowl();
+      errorParams.should.have.members(['singles']);
+    }
+
+    payload.singles = 1;
+    payload.legBy = 1;
+    errorParams = await addBowl();
+    errorParams.should.have.members(['singles']);
+
+    delete payload.legBy;
+    payload.boundary = {
+      run: 4,
+    };
+    for (const boundaryKind of ['regular', 'legBy']) {
+      payload.boundary.kind = boundaryKind;
+      errorParams = await addBowl();
+      errorParams.should.have.members(['singles']);
+    }
+
+    payload = {
+      playedBy: 0,
+      singles: 1,
+      isWide: true,
+    };
+    errorParams = await addBowl();
+    errorParams.should.have.members(['singles']);
+
+    payload = {
+      playedBy: 0,
+    };
+    for (const by of ['spd', -1]) {
+      payload.by = by;
+      errorParams = await addBowl();
+      errorParams.should.have.members(['by']);
+    }
+
+    payload = {
+      playedBy: 0,
+    };
+    for (const legBy of ['spd', -1]) {
+      payload.legBy = legBy;
+      errorParams = await addBowl();
+      errorParams.should.have.members(['legBy']);
+    }
+
+    payload.legBy = 1;
+    payload.isWide = true;
+    errorParams = await addBowl();
+    errorParams.should.have.members(['legBy']);
+
+    payload = {
+      playedBy: 0,
+      legBy: 1,
+      boundary: {
+        run: 4,
+      },
+    };
+    for (const boundaryKind of ['regular', 'legBy']) {
+      payload.boundary.kind = boundaryKind;
+      errorParams = await addBowl();
+      errorParams.should.have.members(['legBy']);
+    }
+
+    payload = {
+      playedBy: 0,
+      isWide: true,
+      boundary: {
+        run: 4,
+      },
+    };
+    for (const boundaryKind of ['regular', 'legBy']) {
+      payload.boundary.kind = boundaryKind;
+      errorParams = await addBowl();
+      errorParams.should.have.members(['boundary']);
+    }
+
+    payload = {
+      playedBy: 0,
+      isNo: true,
+    };
+    errorParams = await addBowl();
+    errorParams.should.have.members(['isNo']);
+  });
+
   after(async () => {
     await Match.deleteMany({});
     await Team.deleteMany({});

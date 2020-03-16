@@ -206,7 +206,7 @@ const OBSTRUCTING_THE_FIELD = 'Obstructing the field';
 const UNCERTAIN_WICKETS = [RUN_OUT, OBSTRUCTING_THE_FIELD];
 
 const bowlValidations = [
-  body('playedBy', '`playedBy` should be an integer')
+  body('playedBy', '`playedBy` is required and should be an integer')
     .isInt({min: 0}),
   body('singles', '`singles` should be an integer')
     .optional({nullable: true})
@@ -481,7 +481,12 @@ router.post('/:id/bowl', [authenticateJwt(), bowlValidations], async (request, r
         _id: matchId,
         creator: request.user._id,
       })
+      .select({state: 1, innings1: 1, innings2: 1})
       .exec();
+
+    if (!match) {
+      throw new Error404(responses.matches.get.err);
+    }
 
     const bowl = nullEmptyValues(request);
     let updateQuery;
@@ -497,8 +502,10 @@ router.post('/:id/bowl', [authenticateJwt(), bowlValidations], async (request, r
       const error = {status: 400, message: `Cannot add bowl in state ${match.state}`};
       throw error;
     }
-    await match.update(updateQuery)
+
+    await match.updateOne(updateQuery)
       .exec();
+    response.status(201).json({success: true});
 
     const innings = match[match.state];
     const amplitudeEvent = {
@@ -508,8 +515,6 @@ router.post('/:id/bowl', [authenticateJwt(), bowlValidations], async (request, r
     };
     Object.assign(amplitudeEvent, bowl);
     Logger.amplitude(Events.Match.Bowl.Create, request.user._id, amplitudeEvent);
-
-    response.json({success: true});
   } catch (err) {
     sendErrorResponse(response, err, 'Error while saving bowl', request.user);
   }
@@ -724,47 +729,6 @@ router.put('/:id', authenticateJwt(), matchEditValidations, (request, response) 
       });
     })
     .catch((err) => sendErrorResponse(response, err, responses.matches.edit.err, request.user));
-});
-
-router.post('/:id/over', authenticateJwt(), (request, response) => {
-  const over = nullEmptyValues(request);
-  over.bowls = [];
-  const {id} = request.params;
-
-  let match;
-  Match
-    .findOne({
-      _id: id,
-      creator: request.user._id,
-    })
-    .then((_match) => {
-      match = _match;
-      let updateQuery;
-      if (match.state === 'innings1') {
-        updateQuery = {$push: {'innings1.overs': over}};
-      } else if (match.state === 'innings2') {
-        updateQuery = {$push: {'innings2.overs': over}};
-      } else {
-        return response.status(400)
-          .json({
-            success: false,
-            message: `Can't add over in state ${match.state}`,
-          });
-      }
-      return match.update(updateQuery)
-        .exec();
-    })
-    .then(() => {
-      const innings = match[match.state];
-      const amplitudeEvent = {
-        match_id: match._id,
-        overIndex: innings.overs.length,
-      };
-      Logger.amplitude(Events.Match.Over, response.req.user._id, amplitudeEvent);
-
-      return response.json({success: true});
-    })
-    .catch((err) => sendErrorResponse(response, err, 'Error while saving over', request.user));
 });
 
 router.get('/done', authenticateJwt(), (request, response) => {
