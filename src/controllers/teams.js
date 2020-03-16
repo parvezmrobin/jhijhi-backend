@@ -6,7 +6,7 @@ const ObjectId = require('mongoose/lib/types/objectid');
 const { check, validationResult } = require('express-validator/check');
 const responses = require('../responses');
 const Team = require('../models/team');
-const { namify, sendErrorResponse, send404Response } = require('../lib/utils');
+const { namify, sendErrorResponse } = require('../lib/utils');
 const { Error400, Error404 } = require('../lib/errors');
 
 /** @type {RequestHandler} */
@@ -148,39 +148,42 @@ router.get('/', authenticateJwt(), (request, response) => {
 });
 
 /* Create a new team */
-router.post('/', authenticateJwt(), teamCreateValidations, (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const { name, shortName } = request.body;
+router.post('/', authenticateJwt(), teamCreateValidations, async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.isEmpty());
+    }
 
-  promise
-    .then(() => Team.create({
+    const {name, shortName} = request.body;
+
+    const createdTeam = Team.create({
       name: namify(name),
       shortName: _formatShortName(shortName),
       creator: request.user._id,
-    }))
-    .then((createdTeam) => response.status(201).json({
+    });
+
+    response.status(201).json({
       success: true,
       message: responses.teams.create.ok(createdTeam.name),
       team: createdTeam,
-    }))
-    .catch((err) => sendErrorResponse(response, err, responses.teams.create.err, request.user));
+    });
+  } catch (e) {
+    sendErrorResponse(response, e, responses.teams.create.err, request.user);
+  }
 });
 
 /* Edit an existing team */
-router.put('/:id', authenticateJwt(), teamUpdateValidations, (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const { name, shortName } = request.body;
+router.put('/:id', authenticateJwt(), teamUpdateValidations, async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
 
-  promise
-    .then(() => Team
+    const {name, shortName} = request.body;
+
+    const updatedTeam = await Team
       .findOneAndUpdate({
         _id: ObjectId(request.params.id),
         creator: request.user._id,
@@ -188,22 +191,23 @@ router.put('/:id', authenticateJwt(), teamUpdateValidations, (request, response)
         name: namify(name),
         shortName: _formatShortName(shortName),
         creator: request.user._id,
-      }, { new: true }))
-    .then((updatedTeam) => {
-      if (!updatedTeam) {
-        return send404Response(response, responses.teams.get.err);
-      }
-      return response.json({
-        success: true,
-        message: responses.teams.edit.ok(name),
-        team: {
-          _id: updatedTeam._id,
-          name: updatedTeam.name,
-          shortName: updatedTeam.shortName,
-        },
-      });
-    })
-    .catch((err) => sendErrorResponse(response, err, responses.teams.edit.err, request.user));
+      }, {new: true});
+
+    if (!updatedTeam) {
+      throw new Error404(responses.teams.get.err);
+    }
+    response.json({
+      success: true,
+      message: responses.teams.edit.ok(name),
+      team: {
+        _id: updatedTeam._id,
+        name: updatedTeam.name,
+        shortName: updatedTeam.shortName,
+      },
+    });
+  } catch (e) {
+    sendErrorResponse(response, e, responses.teams.edit.err, request.user);
+  }
 });
 
 router.get('/:id/presets', authenticateJwt(), async (req, res) => {
@@ -244,7 +248,7 @@ router.post('/:id/presets', [authenticateJwt(), presetCreateValidations], async 
       }, { new: true })
       .select('presets')
       .lean();
-    console.log(updatedTeam);
+
     if (!updatedTeam) {
       throw new Error404(responses.teams.get.err);
     }
@@ -265,7 +269,7 @@ router.delete('/:id/presets/:presetId', [authenticateJwt(), presetDeleteValidati
       throw new Error400(errors.array(), responses.presets.delete.err);
     }
 
-    await Team
+    const team = await Team
       .updateOne({
         _id: req.params.id,
         creator: req.user._id,
@@ -274,6 +278,10 @@ router.delete('/:id/presets/:presetId', [authenticateJwt(), presetDeleteValidati
           presets: { _id: req.params.presetId },
         },
       });
+
+    if (!team) {
+      throw new Error404(responses.teams.get.err);
+    }
 
     res.json({
       success: true,
