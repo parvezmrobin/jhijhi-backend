@@ -29,10 +29,16 @@ function sendErrorResponse(response, err, message, user = null) {
   };
 
   if (statusCode === 400) { // it is a validation error and should be sent with response payload
-    Logger.warn(`Error response ${statusCode}: ${message}`, {err, user});
+    Logger.warn(`Error response ${statusCode}: ${message}`, {
+      err: err instanceof Error ? err.stack : err,
+      user,
+    });
     errorDescription.err = err.error || err.errors || err;
   } else {
-    Logger.error(`Error response ${statusCode}: ${message}`, {err, user});
+    Logger.error(`Error response ${statusCode}: ${message}`, {
+      err: err instanceof Error ? err.stack : err,
+      user,
+    });
   }
 
   response.json(errorDescription);
