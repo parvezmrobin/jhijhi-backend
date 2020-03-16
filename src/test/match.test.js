@@ -446,7 +446,7 @@ describe('Test Match Functionality', function matchTestSuit() {
     const matchBeginPayload = {
       team1Captain: playerIds[0],
       team2Captain: playerIds[3],
-      team1Players: playerIds.slice(0, 2),
+      team1Players: playerIds.slice(0, 3),
       team2Players: playerIds.slice(3),
     };
 
@@ -539,6 +539,48 @@ describe('Test Match Functionality', function matchTestSuit() {
       .send(tossPayload);
 
     res.should.have.status(404);
+  });
+
+  /**
+   * playerIds[3:6] are batting team
+   * playerIds[0:3] are bowling team
+   */
+
+  it('should not add bowl to match of other user', async () => {
+    const bowlPayload = {
+      playedBy: 0,
+      singles: 1,
+    };
+
+    const res = await chai.request(app)
+      .post(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(bowlPayload);
+
+    res.should.have.status(404);
+  });
+
+  it('should not add a bowl without `playedBy` value', async () => {
+    const bowlPayload = {
+      singles: 1,
+    };
+
+    let res = await chai.request(app)
+      .post(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(bowlPayload);
+
+    res.should.have.status(400);
+    res.body.err[0].param.should.be.equals('playedBy');
+
+    bowlPayload.playedBy = null;
+    res = await chai.request(app)
+      .post(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(bowlPayload);
+
+    res.should.have.status(400);
+    res.body.err[0].param.should.be.equals('playedBy');
   });
 
   after(async () => {

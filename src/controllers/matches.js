@@ -2,7 +2,7 @@ const express = require('express');
 
 const router = express.Router();
 const passport = require('passport');
-const {check, body, validationResult} = require('express-validator/check');
+const {body, validationResult} = require('express-validator/check');
 const pick = require('lodash/pick');
 const isMongoId = require('validator/lib/isMongoId');
 const ObjectId = require('mongoose/lib/types/objectid');
@@ -22,24 +22,24 @@ const {namify} = require('../lib/utils');
 const authenticateJwt = passport.authenticate.bind(passport, 'jwt', {session: false});
 
 
-const nameExistsValidation = check('name', 'A match name is required')
+const nameExistsValidation = body('name', 'A match name is required')
   .trim()
   .exists({checkFalsy: true});
-const team1ExistsValidation = check('team1', 'Select a team')
+const team1ExistsValidation = body('team1', 'Select a team')
   .isMongoId()
   .custom(async (team1, {req}) => Team.exists({
     _id: team1,
     creator: req.user._id,
   }));
-const team2ExistsValidation = check('team2', 'Select a team')
+const team2ExistsValidation = body('team2', 'Select a team')
   .isMongoId()
   .custom(async (team2, {req}) => Team.exists({
     _id: team2,
     creator: req.user._id,
   }));
-const minimumOverValidation = check('overs', 'Overs must be greater than 0')
+const minimumOverValidation = body('overs', 'Overs must be greater than 0')
   .isInt({min: 1});
-const genUmpireValidation = (umpireNumber) => check(`umpire${umpireNumber}`)
+const genUmpireValidation = (umpireNumber) => body(`umpire${umpireNumber}`)
   .custom(async (umpire, {req}) => {
     if (!umpire) {
       return true;
@@ -72,7 +72,7 @@ const matchCreateValidations = [
   genUmpireValidation(2),
   genUmpireValidation(3),
   minimumOverValidation,
-  check('name', 'Match Name already taken')
+  body('name', 'Match Name already taken')
     .custom(async (name, {req}) => {
       const exists = await Match.exists({
         name: new RegExp(namify(name), 'i'),
@@ -80,7 +80,7 @@ const matchCreateValidations = [
       });
       return !exists;
     }),
-  check('team1', 'Team 1 and Team 2 should be different.')
+  body('team1', 'Team 1 and Team 2 should be different.')
     .custom((team1, {req}) => team1 !== req.body.team2),
 ];
 
@@ -92,7 +92,7 @@ const matchEditValidations = [
   genUmpireValidation(2),
   genUmpireValidation(3),
   minimumOverValidation,
-  check('name', 'Match Name already taken')
+  body('name', 'Match Name already taken')
     .custom(async (name, {req}) => {
       const exists = await Match.exists({
         _id: {$ne: req.params.id},
@@ -101,12 +101,12 @@ const matchEditValidations = [
       });
       return !exists;
     }),
-  check('team1', 'Team 1 and Team 2 should be different.')
+  body('team1', 'Team 1 and Team 2 should be different.')
     .custom((team1, {req}) => team1 !== req.body.team2),
 ];
 
 const isRequiredMessageBuilder = (_, {path}) => `\`${path}\` is required`;
-const playerIdExistenceValidation = (field) => check(field)
+const playerIdExistenceValidation = (field) => body(field)
   .custom(async (playersIds, {req}) => {
     const existencePromises = playersIds.map((playerId) => Player.exists({
       _id: playerId,
@@ -122,34 +122,34 @@ const playerIdExistenceValidation = (field) => check(field)
     throw new Error(`${nonExistingIds.join(', ')} don't exists`);
   });
 const matchBeginValidations = [
-  check('team1Players', isRequiredMessageBuilder)
+  body('team1Players', isRequiredMessageBuilder)
     .isArray(),
   playerIdExistenceValidation('team1Players'),
-  check('team2Players', isRequiredMessageBuilder)
+  body('team2Players', isRequiredMessageBuilder)
     .isArray(),
   playerIdExistenceValidation('team2Players'),
-  check('team1Captain', 'No captain selected')
+  body('team1Captain', 'No captain selected')
     .isMongoId(),
-  check('team1Captain', 'Must have at least two players')
+  body('team1Captain', 'Must have at least two players')
     .custom((_, {req}) => {
       const {team1Players} = req.body;
       return team1Players && team1Players.length > 1;
     }),
-  check('team1Captain', 'Captain should be a player from same team')
+  body('team1Captain', 'Captain should be a player from same team')
     .custom((team1Captain, {req}) => req.body.team1Players && req.body.team1Players.indexOf(team1Captain) !== -1),
-  check('team2Captain', 'No captain selected')
+  body('team2Captain', 'No captain selected')
     .isMongoId(),
-  check('team2Captain', 'Must have at least two players')
+  body('team2Captain', 'Must have at least two players')
     .custom((_, {req}) => {
       const {team2Players} = req.body;
       return team2Players && team2Players.length > 1;
     }),
-  check('team2Captain', 'Captain should be a player from same team')
+  body('team2Captain', 'Captain should be a player from same team')
     .custom((team2Captain, {req}) => req.body.team2Players && req.body.team2Players.indexOf(team2Captain) !== -1),
 ];
 
 const matchTossValidations = [
-  check('won')
+  body('won')
     .custom((won, {req}) => Match
       .findById(req.params.id)
       .exec()
@@ -159,14 +159,14 @@ const matchTossValidations = [
         }
         return true;
       })),
-  check('choice')
+  body('choice')
     .isIn(['Bat', 'Bowl']),
 ];
 
 const uncertainOutValidations = [
-  check('batsman')
+  body('batsman')
     .isInt({min: 0}),
-  check('batsman')
+  body('batsman')
     .custom((batsman, {req}) => Match
       .findById(req.params.id)
       .lean()
@@ -192,7 +192,7 @@ const uncertainOutValidations = [
 
         return true;
       })),
-  check('kind', '`kind` should be either run out or obstructing the field')
+  body('kind', '`kind` should be either run out or obstructing the field')
     .isIn(['Run out', 'Obstructing the field']),
 ];
 
@@ -202,41 +202,7 @@ const UNCERTAIN_WICKETS = [RUN_OUT, OBSTRUCTING_THE_FIELD];
 
 const bowlValidations = [
   body('playedBy', '`playedBy` should be an integer')
-    .optional({nullable: true})
     .isInt({min: 0}),
-  body('isWicket')
-    .optional({nullable: true})
-    .custom((isWicket, {req}) => {
-      if (!Object.keys(isWicket).length) {
-        return true;
-      }
-      if (typeof isWicket.kind !== 'string') {
-        throw new Error('`Wicket kind` should be a string');
-      }
-      if (UNCERTAIN_WICKETS.includes(isWicket.kind)) {
-        if (!Number.isInteger(isWicket.player)) {
-          throw new Error(`Out player should be provided for out type ${isWicket.kind}`);
-        }
-      } else { // if in CERTAIN_WICKETS
-        const {isWide, isNo} = req.body;
-        if (isWide || isNo) {
-          throw new Error(`Wicket type ${isWicket.kind} cannot happen in a ${isNo ? 'No' : 'Wide'} bowl`);
-        }
-
-        const {singles, by, legBy} = req.body;
-        // eslint-disable-next-line no-nested-ternary
-        const scoreType = singles ? 'single' : by ? 'by' : legBy ? 'leg by' : null;
-        if (scoreType) {
-          throw new Error(`Cannot take ${scoreType} run with wicket type ${isWicket.kind}`);
-        }
-      }
-      const {boundary} = req.body;
-      if (boundary != null && boundary.run) {
-        throw new Error('Wicket and boundary cannot happen in the same bowl');
-      }
-
-      return true;
-    }),
   body('singles', '`singles` should be an integer')
     .optional({nullable: true})
     .isInt({min: 0})
@@ -298,10 +264,44 @@ const bowlValidations = [
       return true;
     }),
   body('isWide', '`isWide` should be a boolean')
+    .optional({nullable: true})
     .isBoolean(),
   body('isNo', '`isNo` should be a string')
     .optional({nullable: true})
     .isString(),
+  body('isWicket')
+    .optional({nullable: true})
+    .custom((isWicket, {req}) => {
+      if (!Object.keys(isWicket).length) {
+        return true;
+      }
+      if (typeof isWicket.kind !== 'string') {
+        throw new Error('`Wicket kind` should be a string');
+      }
+      if (UNCERTAIN_WICKETS.includes(isWicket.kind)) {
+        if (!Number.isInteger(isWicket.player)) {
+          throw new Error(`Out player should be provided for out type ${isWicket.kind}`);
+        }
+      } else { // if in CERTAIN_WICKETS
+        const {isWide, isNo} = req.body;
+        if (isWide || isNo) {
+          throw new Error(`Wicket type ${isWicket.kind} cannot happen in a ${isNo ? 'No' : 'Wide'} bowl`);
+        }
+
+        const {singles, by, legBy} = req.body;
+        // eslint-disable-next-line no-nested-ternary
+        const scoreType = singles ? 'single' : by ? 'by' : legBy ? 'leg by' : null;
+        if (scoreType) {
+          throw new Error(`Cannot take ${scoreType} run with wicket type ${isWicket.kind}`);
+        }
+      }
+      const {boundary} = req.body;
+      if (boundary != null && boundary.run) {
+        throw new Error('Wicket and boundary cannot happen in the same bowl');
+      }
+
+      return true;
+    }),
 ];
 
 router.put('/:id/begin', authenticateJwt(), matchBeginValidations, async (request, response) => {
@@ -413,6 +413,52 @@ router.put('/:id/toss', [authenticateJwt(), matchTossValidations], async (reques
   }
 });
 
+router.post('/:id/bowl', [authenticateJwt(), bowlValidations], async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+    const matchId = request.params.id;
+    const match = await Match
+      .findOne({
+        _id: matchId,
+        creator: request.user._id,
+      })
+      .exec();
+
+    const bowl = nullEmptyValues(request);
+    let updateQuery;
+    if (match.state === 'innings1') {
+      updateQuery = {
+        $push: {[`innings1.overs.${match.innings1.overs.length - 1}.bowls`]: bowl},
+      };
+    } else if (match.state === 'innings2') {
+      updateQuery = {
+        $push: {[`innings2.overs.${match.innings2.overs.length - 1}.bowls`]: bowl},
+      };
+    } else {
+      const error = {status: 400, message: `Cannot add bowl in state ${match.state}`};
+      throw error;
+    }
+    await match.update(updateQuery)
+      .exec();
+
+    const innings = match[match.state];
+    const amplitudeEvent = {
+      match_id: match._id,
+      overIndex: innings.overs.length - 1,
+      bowlIndex: innings.overs[innings.overs.length - 1].bowls.length,
+    };
+    Object.assign(amplitudeEvent, bowl);
+    Logger.amplitude(Events.Match.Bowl.Create, request.user._id, amplitudeEvent);
+
+    response.json({success: true});
+  } catch (err) {
+    sendErrorResponse(response, err, 'Error while saving bowl', request.user);
+  }
+});
+
 router.put('/:id/declare', authenticateJwt(), (request, response) => {
   const {id} = request.params;
   const {state: nextState} = nullEmptyValues(request);
@@ -459,50 +505,6 @@ router.put('/:id/declare', authenticateJwt(), (request, response) => {
       return response.json(updateState);
     })
     .catch((err) => sendErrorResponse(response, err, responses.matches.get.err, request.user));
-});
-
-router.post('/:id/bowl', authenticateJwt(), bowlValidations, (request, response) => {
-  const errors = validationResult(request);
-  const matchId = request.params.id;
-  const promise = errors.isEmpty() ? Match
-    .findOne({
-      _id: matchId,
-      creator: request.user._id,
-    }).exec() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const bowl = nullEmptyValues(request);
-
-  let match;
-  promise
-    .then((_match) => {
-      match = _match;
-      let updateQuery;
-      if (match.state === 'innings1') {
-        updateQuery = {$push: {[`innings1.overs.${match.innings1.overs.length - 1}.bowls`]: bowl}};
-      } else if (match.state === 'innings2') {
-        updateQuery = {$push: {[`innings2.overs.${match.innings2.overs.length - 1}.bowls`]: bowl}};
-      } else {
-        const error = {status: 400, message: `Cannot add bowl in state ${match.state}`};
-        throw error;
-      }
-      return match.update(updateQuery)
-        .exec();
-    })
-    .then(() => {
-      const innings = match[match.state];
-      const amplitudeEvent = {
-        match_id: match._id,
-        overIndex: innings.overs.length - 1,
-        bowlIndex: innings.overs[innings.overs.length - 1].bowls.length,
-      };
-      Object.assign(amplitudeEvent, bowl);
-      Logger.amplitude(Events.Match.Bowl.Create, request.user._id, amplitudeEvent);
-
-      return response.json({success: true});
-    })
-    .catch((err) => sendErrorResponse(response, err, 'Error while saving bowl', request.user));
 });
 
 router.put('/:id/bowl', authenticateJwt(), (request, response) => {
