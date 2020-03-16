@@ -280,6 +280,44 @@ describe('Test Team Functionality', function teamTestSuit() {
     res.should.have.status(400);
   });
 
+  it('should not create a duplicate preset', async () => {
+    const res = await chai.request(app)
+      .post(`/api/teams/${teamId}/presets`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({
+        name: 'team',
+        players: [player1, player2],
+      });
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.contain('name')
+      .and.not.contain('players');
+  });
+  it('should not insert same player into a preset', async () => {
+    const res = await chai.request(app)
+      .post(`/api/teams/${teamId}/presets`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({
+        name: 'team1',
+        players: [player1, player1],
+      });
+    res.should.have.status(400);
+    res.body.err.map((e) => e.param).should.contain('players')
+      .and.not.contain('name');
+  });
+  it('should not delete preset of another user', async () => {
+    const res = await chai.request(app)
+      .delete(`/api/teams/${teamId}/presets`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send();
+    res.should.have.status(404);
+  });
+  it('should not delete preset', async () => {
+    const res = await chai.request(app)
+      .delete(`/api/teams/${teamId}/presets`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send();
+    res.should.have.status(404);
+  });
   after(async () => {
     await Team.deleteMany({});
     await Player.deleteMany({});
