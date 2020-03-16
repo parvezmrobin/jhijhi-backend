@@ -310,7 +310,7 @@ describe('Test Team Functionality', function teamTestSuit() {
       .send();
     res.should.have.status(404);
   });
-  it('should not delete preset', async () => {
+  it('should delete a preset', async () => {
     const res = await chai.request(app)
       .delete(`/api/teams/${teamId}/presets`)
       .set('Authorization', `Bearer ${token1}`)
