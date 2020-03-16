@@ -17,7 +17,6 @@ describe('Test Team Functionality', function teamTestSuit() {
   let token1;
   let token2;
   let teamId;
-  let presetId;
   let player1;
   let player2;
   let player3;
@@ -255,7 +254,7 @@ describe('Test Team Functionality', function teamTestSuit() {
     return preset._id;
   }
   it('should successfully create a preset', async () => {
-    presetId = await testCreatePreset(token1);
+    await testCreatePreset(token1);
   });
 
   it('should not create a preset of another user', async () => {
