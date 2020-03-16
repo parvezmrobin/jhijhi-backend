@@ -196,6 +196,11 @@ const uncertainOutValidations = [
     .isIn(['Run out', 'Obstructing the field']),
 ];
 
+const overValidation = [
+  body('bowledBy', '`bowledBy` is required and should be an integer')
+    .isInt({min: 0}),
+];
+
 const RUN_OUT = 'Run out';
 const OBSTRUCTING_THE_FIELD = 'Obstructing the field';
 const UNCERTAIN_WICKETS = [RUN_OUT, OBSTRUCTING_THE_FIELD];
@@ -410,6 +415,57 @@ router.put('/:id/toss', [authenticateJwt(), matchTossValidations], async (reques
     });
   } catch (err) {
     sendErrorResponse(response, err, responses.matches.toss.err, request.user);
+  }
+});
+
+router.post('/:id/over', [authenticateJwt(), overValidation], async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+    const {bowledBy} = nullEmptyValues(request);
+    const over = {
+      bowledBy,
+      bowls: [],
+    };
+    const {id: matchId} = request.params;
+
+    const match = await Match
+      .findOne({
+        _id: matchId,
+        creator: request.user._id,
+      })
+      .exec();
+
+    if (!match) {
+      throw new Error404(responses.matches.get.err);
+    }
+
+    let updateQuery;
+    if (match.state === 'innings1') {
+      updateQuery = {$push: {'innings1.overs': over}};
+    } else if (match.state === 'innings2') {
+      updateQuery = {$push: {'innings2.overs': over}};
+    } else {
+      return response.status(400)
+        .json({
+          success: false,
+          message: `Can't add over in state ${match.state}`,
+        });
+    }
+    await match.update(updateQuery)
+      .exec();
+    response.status(201).json({success: true});
+
+    const innings = match[match.state];
+    const amplitudeEvent = {
+      match_id: match._id,
+      overIndex: innings.overs.length,
+    };
+    Logger.amplitude(Events.Match.Over, response.req.user._id, amplitudeEvent);
+  } catch (e) {
+    sendErrorResponse(response, e, 'Error while saving over', request.user);
   }
 });
 

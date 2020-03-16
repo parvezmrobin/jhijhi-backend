@@ -546,6 +546,36 @@ describe('Test Match Functionality', function matchTestSuit() {
    * playerIds[0:3] are bowling team
    */
 
+  it('should not add an over without `bowledBy`', async () => {
+    for (const bowledBy of [null, -1, 'spd']) {
+      const res = await chai.request(app)
+        .post(`/api/matches/${matchId1}/over`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send({bowledBy});
+
+      res.should.have.status(400);
+      res.body.err[0].param.should.be.equals('bowledBy');
+    }
+  });
+
+  it('should not add an over to match of other user', async () => {
+    const res = await chai.request(app)
+      .post(`/api/matches/${matchId1}/over`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send({bowledBy: 0});
+
+    res.should.have.status(404);
+  });
+
+  it('should add an over to match', async () => {
+    const res = await chai.request(app)
+      .post(`/api/matches/${matchId1}/over`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({bowledBy: 0});
+
+    res.should.have.status(201);
+  });
+
   it('should not add bowl to match of other user', async () => {
     const bowlPayload = {
       playedBy: 0,
