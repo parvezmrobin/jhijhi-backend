@@ -714,6 +714,18 @@ describe('Test Match Functionality', function matchTestSuit() {
     errorParams.should.have.members(['isNo']);
   });
 
+  it('should not add bowl to match of other user', async () => {
+    const payload = {
+      playedBy: 0,
+      singles: 1,
+    };
+    const res = await chai.request(app)
+      .post(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(payload);
+    res.should.have.status(404);
+  });
+
   after(async () => {
     await Match.deleteMany({});
     await Team.deleteMany({});
