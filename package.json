@@ -68,6 +68,7 @@
     "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.1",
     "eslint-plugin-promise": "^4.1.1",
-    "mocha": "^6.0.2"
+    "mocha": "^6.0.2",
+    "nyc": "^15.0.0"
   }
 }
