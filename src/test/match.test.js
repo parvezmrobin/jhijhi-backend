@@ -567,13 +567,17 @@ describe('Test Match Functionality', function matchTestSuit() {
     res.should.have.status(404);
   });
 
-  it('should add an over to match', async () => {
+  async function testAddNewOver() {
     const res = await chai.request(app)
       .post(`/api/matches/${matchId1}/over`)
       .set('Authorization', `Bearer ${token1}`)
       .send({bowledBy: 0});
 
     res.should.have.status(201);
+  }
+
+  it('should add an over to match', async () => {
+    await testAddNewOver();
   });
 
   it('should not add bowl to match of other user', async () => {
@@ -793,16 +797,66 @@ describe('Test Match Functionality', function matchTestSuit() {
     res.body.err[0].msg.should.match(/boundary/i);
   });
 
-  it('should not add bowl to match of other user', async () => {
-    const payload = {
+  it('should add several bowls to match', async () => {
+    let payload;
+
+    const makeRequest = async () => {
+      const res = await chai.request(app)
+        .post(`/api/matches/${matchId1}/bowl`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+      res.should.have.status(201);
+      return res.body;
+    };
+
+    const payloads = [{
       playedBy: 0,
       singles: 1,
+    }, {
+      playedBy: 0,
+      singles: 1,
+      by: 2,
+    }, {
+      playedBy: 0,
+      by: 1,
+      legBy: 2,
+    }, {
+      playedBy: 0,
+      boundary: {
+        kind: 'regular',
+        run: 4,
+      },
+    }, {
+      playedBy: 0,
+      singles: 2,
+      boundary: {
+        kind: 'by',
+        run: 4,
+      },
+    }, {
+      playedBy: 0,
+      isWicket: {
+        kind: 'Bold',
+      },
+    }, {
+      playedBy: 2,
+      isWicket: {
+        kind: 'Run out',
+        player: 1,
+      },
+    }];
+
+    for (payload of payloads) {
+      await makeRequest();
+    }
+
+    await testAddNewOver();
+
+    payload = {
+      playedBy: 2,
+      singles: 1,
     };
-    const res = await chai.request(app)
-      .post(`/api/matches/${matchId1}/bowl`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send(payload);
-    res.should.have.status(404);
+    await makeRequest();
   });
 
   after(async () => {

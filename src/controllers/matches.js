@@ -436,6 +436,7 @@ router.post('/:id/over', [authenticateJwt(), overValidation], async (request, re
         _id: matchId,
         creator: request.user._id,
       })
+      .select({state: 1})
       .exec();
 
     if (!match) {
@@ -448,11 +449,12 @@ router.post('/:id/over', [authenticateJwt(), overValidation], async (request, re
     } else if (match.state === 'innings2') {
       updateQuery = {$push: {'innings2.overs': over}};
     } else {
-      return response.status(400)
+      response.status(400)
         .json({
           success: false,
           message: `Can't add over in state ${match.state}`,
         });
+      return;
     }
     await match.update(updateQuery)
       .exec();
