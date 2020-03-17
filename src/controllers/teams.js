@@ -152,12 +152,12 @@ router.post('/', authenticateJwt(), teamCreateValidations, async (request, respo
   try {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
-      throw new Error400(errors.isEmpty());
+      throw new Error400(errors.array());
     }
 
     const {name, shortName} = request.body;
 
-    const createdTeam = Team.create({
+    const createdTeam = await Team.create({
       name: namify(name),
       shortName: _formatShortName(shortName),
       creator: request.user._id,
