@@ -115,19 +115,6 @@ const presetCreateValidations = [
     }),
 ];
 
-const presetDeleteValidations = [
-  check('presetId', responses.presets.get.err)
-    .custom(async (presetId, { req }) => {
-      const teamExists = await Team
-        .exists({
-          'presets._id': presetId,
-          creator: req.user._id,
-        })
-        .exec();
-
-      return teamExists;
-    }),
-];
 // endregion
 
 // region Controllers
@@ -284,7 +271,7 @@ router.post('/:id/presets', [authenticateJwt(), presetCreateValidations], async 
   }
 });
 
-router.delete('/:id/presets/:presetId', [authenticateJwt(), presetDeleteValidations], async (req, res) => {
+router.delete('/:id/presets/:presetId', [authenticateJwt()], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -300,8 +287,7 @@ router.delete('/:id/presets/:presetId', [authenticateJwt(), presetDeleteValidati
           presets: { _id: req.params.presetId },
         },
       });
-
-    if (!team) {
+    if (!team.nModified) {
       throw new Error404(responses.teams.get.err);
     }
 

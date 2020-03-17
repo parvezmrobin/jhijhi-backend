@@ -21,6 +21,7 @@ describe('Test Team Functionality', function teamTestSuit() {
   let player2;
   let player3;
   let player4;
+  let presetId;
 
   async function createPlayer(token, playerName, playerJerseyNo) {
     const res = await chai.request(app)
@@ -254,7 +255,7 @@ describe('Test Team Functionality', function teamTestSuit() {
     return preset._id;
   }
   it('should successfully create a preset', async () => {
-    await testCreatePreset(token1);
+    presetId = await testCreatePreset(token1);
   });
 
   it('should not create a preset of another user', async () => {
@@ -305,17 +306,17 @@ describe('Test Team Functionality', function teamTestSuit() {
   });
   it('should not delete preset of another user', async () => {
     const res = await chai.request(app)
-      .delete(`/api/teams/${teamId}/presets`)
+      .delete(`/api/teams/${teamId}/presets/${presetId}`)
       .set('Authorization', `Bearer ${token2}`)
       .send();
     res.should.have.status(404);
   });
   it('should delete a preset', async () => {
     const res = await chai.request(app)
-      .delete(`/api/teams/${teamId}/presets`)
+      .delete(`/api/teams/${teamId}/presets/${presetId}`)
       .set('Authorization', `Bearer ${token1}`)
       .send();
-    res.should.have.status(404);
+    res.should.have.status(200);
   });
   after(async () => {
     await Team.deleteMany({});
