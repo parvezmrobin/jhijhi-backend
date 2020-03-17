@@ -714,6 +714,85 @@ describe('Test Match Functionality', function matchTestSuit() {
     errorParams.should.have.members(['isNo']);
   });
 
+  it('should not add bowl with invalid wicket', async () => {
+    let payload = {
+      playedBy: 0,
+      isWicket: {
+        kind: 1,
+      },
+    };
+
+    const makeRequest = () => chai.request(app)
+      .post(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(payload);
+
+    let res = await makeRequest();
+    res.should.have.status(400);
+    res.body.err[0].param.should.contain('isWicket');
+    res.body.err[0].msg.should.match(/Wicket kind/i);
+
+    for (const uncertainWicket of ['Run out', 'Obstructing the field']) {
+      payload.isWicket.kind = uncertainWicket;
+      res = await makeRequest();
+      res.should.have.status(400);
+      res.body.err[0].param.should.contain('isWicket');
+      res.body.err[0].msg.should.match(new RegExp(uncertainWicket, 'i'));
+      res.body.err[0].msg.should.match(/out player/i);
+    }
+
+    payload.isWicket.kind = 'Bold';
+    payload.isWide = true;
+    res = await makeRequest();
+    res.should.have.status(400);
+    res.body.err[0].param.should.contain('isWicket');
+    res.body.err[0].msg.should.match(/bold/i);
+    res.body.err[0].msg.should.match(/wide bowl/i);
+
+    delete payload.isWide;
+    payload.isNo = 'Overstepping';
+    res = await makeRequest();
+    res.should.have.status(400);
+    res.body.err[0].param.should.contain('isWicket');
+    res.body.err[0].msg.should.match(/bold/i);
+    res.body.err[0].msg.should.match(/no bowl/i);
+
+    payload = {
+      playedBy: 0,
+      isWicket: {
+        kind: 'Bold',
+      },
+    };
+
+    let lastScoreType = null;
+    for (const scoreType of ['singles', 'by', 'legBy']) {
+      payload[scoreType] = 1;
+      delete payload[lastScoreType];
+      lastScoreType = scoreType;
+      res = await makeRequest();
+      res.should.have.status(400);
+      res.body.err[0].param.should.contain('isWicket');
+      res.body.err[0].msg.should.match(/bold/i);
+      res.body.err[0].msg.should.match(/cannot take.*run/i);
+    }
+
+    payload = {
+      playedBy: 0,
+      isWicket: {
+        kind: 'Bold',
+      },
+      boundary: {
+        kind: 'regular',
+        run: 4,
+      },
+    };
+    res = await makeRequest();
+    res.should.have.status(400);
+    res.body.err[0].param.should.contain('isWicket');
+    res.body.err[0].msg.should.match(/wicket/i);
+    res.body.err[0].msg.should.match(/boundary/i);
+  });
+
   it('should not add bowl to match of other user', async () => {
     const payload = {
       playedBy: 0,
