@@ -91,6 +91,28 @@ const presetCreateValidations = [
 
       return !team;
     }),
+  check('players')
+    .custom((players) => {
+      const duplicatePairs = [];
+      for (let i = 0; i < players.length - 1; i++) {
+        const duplicatePair = [players[i]];
+        for (let j = i + 1; j < players.length; j++) {
+          if (players[i] === players[j]) {
+            duplicatePair.push(players[j]);
+          }
+        }
+        if (duplicatePair.length > 1) {
+          duplicatePairs.push(duplicatePair);
+        }
+      }
+      if (duplicatePairs.length) {
+        const message = duplicatePairs
+          .map((duplicatePair) => `Player ID ${duplicatePair.join(', ')} are duplicate`)
+          .join('. ');
+        throw new Error(message);
+      }
+      return true;
+    }),
 ];
 
 const presetDeleteValidations = [
@@ -148,7 +170,7 @@ router.get('/', authenticateJwt(), (request, response) => {
 });
 
 /* Create a new team */
-router.post('/', authenticateJwt(), teamCreateValidations, async (request, response) => {
+router.post('/', [authenticateJwt(), teamCreateValidations], async (request, response) => {
   try {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
