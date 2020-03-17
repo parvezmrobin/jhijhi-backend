@@ -436,7 +436,7 @@ router.post('/:id/over', [authenticateJwt(), overValidation], async (request, re
         _id: matchId,
         creator: request.user._id,
       })
-      .select({state: 1})
+      .select({state: 1, innings1: 1, innings2: 1})
       .exec();
 
     if (!match) {
@@ -522,72 +522,6 @@ router.post('/:id/bowl', [authenticateJwt(), bowlValidations], async (request, r
   }
 });
 
-router.put('/:id/declare', authenticateJwt(), (request, response) => {
-  const {id} = request.params;
-  const {state: nextState} = nullEmptyValues(request);
-
-  let match;
-  Match
-    .findOne({
-      _id: id,
-      creator: request.user._id,
-    })
-    .exec()
-    .then((_match) => {
-      if (!_match) {
-        throw new Error404(responses.matches.e404);
-      }
-      match = _match;
-      if (nextState && ['done', 'innings2'].indexOf(nextState) === -1) {
-        throw new Error400('Next state must be either \'done\' or \'innings1\'');
-      } else if (['innings1', 'innings2'].indexOf(match.state) === -1) {
-        throw new Error400('State must be either \'innings1\' or \'innings1\'');
-      }
-      const updateState = {};
-      if (nextState === 'innings2') {
-        match.state = 'innings2';
-        // prevent double initialization of `match.innings2`
-        updateState.innings2 = match.innings2 ? match.innings2 : (match.innings2 = {overs: []});
-      } else if (nextState === 'done') {
-        match.state = 'done';
-      } else if (match.state.toString() === 'innings1') {
-        // legacy option that deals request without state parameter
-        // not recommended
-        match.state = 'innings2';
-        updateState.innings2 = match.innings2 = {overs: []};
-      } else {
-        match.state = 'done';
-      }
-      updateState.state = match.state;
-      return Promise.all([updateState, match.save()]);
-    })
-    .then(([updateState]) => {
-      const amplitudeEvent = {match_id: match._id, ...updateState};
-      Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
-
-      return response.json(updateState);
-    })
-    .catch((err) => sendErrorResponse(response, err, responses.matches.get.err, request.user));
-});
-
-router.put('/:id/bowl', authenticateJwt(), (request, response) => {
-  const errors = validationResult(request);
-  const matchId = request.params.id;
-  const promise = errors.isEmpty() ? Match
-    .findOne({
-      _id: matchId,
-      creator: request.user._id,
-    }).lean().exec() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-
-  const {bowl, overNo, bowlNo} = nullEmptyValues(request);
-  promise
-    .then((match) => _updateBowlAndSend(match, bowl, response, overNo, bowlNo))
-    .catch((err) => sendErrorResponse(response, err, 'Error while updating bowl', request.user));
-});
-
 const _updateBowlAndSend = (match, bowl, response, overNo, bowlNo) => {
   const overExists = Number.isInteger(overNo);
   const bowlExists = Number.isInteger(bowlNo);
@@ -603,16 +537,16 @@ const _updateBowlAndSend = (match, bowl, response, overNo, bowlNo) => {
   let prevBowl; // if `overNo` and `bowlNo` is not provided, then update the last bowl
   if (match.state === 'innings1') {
     const {overs} = match.innings1;
-    overNo = overExists ? overNo : overs.length - 1;
+    overNo = overExists ? overNo : overs.length - 1; // eslint-disable-line no-param-reassign
     const {bowls} = overs[overNo];
-    bowlNo = bowlExists ? bowlNo : bowls.length - 1;
+    bowlNo = bowlExists ? bowlNo : bowls.length - 1; // eslint-disable-line no-param-reassign
     prevBowl = bowls[bowlNo];
     field = `innings1.overs.${overNo}.bowls.${bowlNo}`;
   } else if (match.state === 'innings2') {
     const {overs} = match.innings2;
-    overNo = overExists ? overNo : overs.length - 1;
+    overNo = overExists ? overNo : overs.length - 1; // eslint-disable-line no-param-reassign
     const {bowls} = overs[overNo];
-    bowlNo = bowlExists ? bowlNo : bowls.length - 1;
+    bowlNo = bowlExists ? bowlNo : bowls.length - 1; // eslint-disable-line no-param-reassign
     prevBowl = bowls[bowlNo];
     field = `innings2.overs.${overNo}.bowls.${bowlNo}`;
   } else {
@@ -639,187 +573,227 @@ const _updateBowlAndSend = (match, bowl, response, overNo, bowlNo) => {
     });
 };
 
-router.put('/:id/by', authenticateJwt(), (request, response) => {
-  const {
-    run, boundary, overNo, bowlNo,
-  } = nullEmptyValues(request);
-  const {id} = request.params;
-  Match
-    .findOne({
-      _id: id,
-      creator: request.user._id,
-    }, 'state innings1 innings2')
-    .lean()
-    .exec()
-    .then((match) => {
-      const bowl = !boundary ? {by: run} : {
-        boundary: {
-          run,
-          kind: 'by',
-        },
-      };
-      return _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
-    })
-    .catch((err) => sendErrorResponse(response, err, 'Error while updating bowl', request.user));
+router.put('/:id/bowl', authenticateJwt(), async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+
+    const matchId = request.params.id;
+    const match = await Match
+      .findOne({
+        _id: matchId,
+        creator: request.user._id,
+      }).lean().exec();
+
+    if (!match) {
+      throw new Error404(responses.matches.get.err);
+    }
+
+    const {bowl, overNo, bowlNo} = nullEmptyValues(request);
+    await _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
+  } catch (err) {
+    sendErrorResponse(response, err, 'Error while updating bowl', request.user);
+  }
 });
 
-router.put('/:id/uncertain-out', uncertainOutValidations, authenticateJwt(), (request, response) => {
-  const {id} = request.params;
-  const errors = validationResult(request);
-  const promise = errors.isEmpty()
-    ? Match
+router.put('/:id/by', authenticateJwt(), async (request, response) => {
+  try {
+    const {
+      run, boundary, overNo, bowlNo,
+    } = nullEmptyValues(request);
+    const {id} = request.params;
+    const match = await Match
+      .findOne({
+        _id: id,
+        creator: request.user._id,
+      }, 'state innings1 innings2')
+      .lean()
+      .exec();
+    const bowl = !boundary ? {by: run} : {
+      boundary: {
+        run,
+        kind: 'by',
+      },
+    };
+    await _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
+  } catch (err) {
+    sendErrorResponse(response, err, 'Error while updating bowl', request.user);
+  }
+});
+
+router.put('/:id/uncertain-out', [uncertainOutValidations, authenticateJwt()], async (request, response) => {
+  try {
+    const {id} = request.params;
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+
+    const match = await Match
       .findOne({
         _id: id,
         creator: request.user._id,
       })
       .lean()
-      .exec()
-    : Promise.reject({
-      status: 400,
-      errors: errors.array(),
-    });
+      .exec();
 
-  promise
-    .then((match) => {
-      const {
-        batsman, kind, overNo, bowlNo,
-      } = nullEmptyValues(request);
-      const bowl = {
-        isWicket: {
-          kind,
-          player: batsman,
-        },
-      };
-      return _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
-    })
-    .catch((err) => sendErrorResponse(response, err, 'Error while adding out', request.user));
-});
-
-router.put('/:id', authenticateJwt(), matchEditValidations, (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const {
-    name, team1, team2, umpire1, umpire2, umpire3, overs, tags,
-  } = request.body;
-
-  promise
-    .then(() => Match
-      .findOneAndUpdate({
-        _id: ObjectId(request.params.id),
-        creator: request.user._id,
-      }, {
-        name,
-        team1,
-        team2,
-        umpire1,
-        umpire2,
-        umpire3,
-        overs,
-        tags,
-      }, {new: true}))
-    .then((updatedMatch) => {
-      if (!updatedMatch) {
-        return send404Response(response, responses.matches.get.err);
-      }
-      return response.json({
-        success: true,
-        message: responses.matches.edit.ok(name),
-        match: pick(updatedMatch, ['_id', 'name', 'team1', 'team2', 'umpire1', 'umpire2', 'umpire3', 'overs', 'tags']),
-      });
-    })
-    .catch((err) => sendErrorResponse(response, err, responses.matches.edit.err, request.user));
-});
-
-router.get('/done', authenticateJwt(), (request, response) => {
-  const query = {
-    creator: request.user._id,
-    state: 'done',
-  };
-  if (request.query.search) {
-    query.name = new RegExp(request.query.search, 'i');
-  }
-  Match
-    .find(query)
-    .lean()
-    .then((matches) => response.json(matches))
-    .catch((err) => sendErrorResponse(response, err, responses.matches.index.err, request.user));
-});
-
-/**
- * GET tags listing.
- */
-router.get('/tags', authenticateJwt(), (request, response) => {
-  Match.aggregate()
-    .match({creator: request.user._id})
-    .group({
-      _id: 0,
-      tags: {$push: '$tags'},
-    })
-    .project({
-      tags: {
-        $reduce: {
-          input: '$tags',
-          initialValue: [],
-          in: {$setUnion: ['$$value', '$$this']},
-        },
+    const {
+      batsman, kind, overNo, bowlNo,
+    } = nullEmptyValues(request);
+    const bowl = {
+      isWicket: {
+        kind,
+        player: batsman,
       },
-    })
-    .exec()
-    .then((aggregation) => {
-      const tags = !aggregation || !aggregation.length ? {tags: []} : aggregation[0];
-      return response.json(tags.tags);
-    })
-    .catch((err) => sendErrorResponse(response, err, responses.matches.tags.err, request.user));
+    };
+    await _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
+  } catch (err) {
+    sendErrorResponse(response, err, 'Error while adding out', request.user);
+  }
 });
 
-router.get('/:id', (request, response) => {
-  Match
-    .findOne({_id: request.params.id})
-    .populate('team1')
-    .populate('team2')
-    .populate('team1Captain')
-    .populate('team2Captain')
-    .populate('team1Players')
-    .populate('team2Players')
-    .lean()
-    .exec()
-    .then((match) => {
-      // eslint-disable-next-line no-param-reassign
-      match.tags = match.tags || []; // put a default value if `tags` field is absent
-      return match;
-    })
-    .then((match) => response.json(match))
-    .catch((err) => sendErrorResponse(response, err, responses.matches.get.err, request.user));
+router.put('/:id/declare', authenticateJwt(), async (request, response) => {
+  try {
+    const {id} = request.params;
+    const {state: nextState} = nullEmptyValues(request);
+
+    const match = await Match
+      .findOne({
+        _id: id,
+        creator: request.user._id,
+      })
+      .exec();
+    if (!match) {
+      throw new Error404(responses.matches.e404);
+    }
+
+    if (nextState && ['done', 'innings2'].indexOf(nextState) === -1) {
+      throw new Error400('Next state must be either \'done\' or \'innings1\'');
+    } else if (['innings1', 'innings2'].indexOf(match.state) === -1) {
+      throw new Error400('State must be either \'innings1\' or \'innings1\'');
+    }
+    const updateState = {};
+    if (nextState === 'innings2') {
+      match.state = 'innings2';
+      // prevent double initialization of `match.innings2`
+      updateState.innings2 = match.innings2 ? match.innings2 : (match.innings2 = {overs: []});
+    } else if (nextState === 'done') {
+      match.state = 'done';
+    } else if (match.state.toString() === 'innings1') {
+      // legacy option that deals request without state parameter
+      // not recommended
+      match.state = 'innings2';
+      match.innings2 = {overs: []};
+      updateState.innings2 = match.innings2;
+    } else {
+      match.state = 'done';
+    }
+    updateState.state = match.state;
+    await match.save();
+
+    const amplitudeEvent = {match_id: match._id, ...updateState};
+    Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
+
+    response.json(updateState);
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.get.err, request.user);
+  }
+});
+
+router.get('/done', authenticateJwt(), async (request, response) => {
+  try {
+    const query = {
+      creator: request.user._id,
+      state: 'done',
+    };
+    if (request.query.search) {
+      query.name = new RegExp(request.query.search, 'i');
+    }
+    const matches = await Match
+      .find(query)
+      .lean()
+      .exec();
+    response.json(matches);
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.index.err, request.user);
+  }
 });
 
 /**
  *  GET matches listing.
  */
-router.get('/', authenticateJwt(), (request, response) => {
-  const query = {
-    creator: request.user._id,
-    state: {$ne: 'done'},
-  };
-  if (request.query.search) {
-    const regExp = new RegExp(request.query.search, 'i');
-    query.$or = [{name: regExp}, {tags: regExp}];
+router.get('/', authenticateJwt(), async (request, response) => {
+  try {
+    const query = {
+      creator: request.user._id,
+      state: {$ne: 'done'},
+    };
+    if (request.query.search) {
+      const regExp = new RegExp(request.query.search, 'i');
+      query.$or = [{name: regExp}, {tags: regExp}];
+    }
+    const matches = await Match
+      .find(query)
+      .lean()
+      .exec();
+    matches.forEach((match) => {
+      // eslint-disable-next-line no-param-reassign
+      match.tags = match.tags || [];
+    }); // put a default value if `tags` field is absent
+    response.json(matches);
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.index.err, request.user);
   }
-  Match
-    .find(query)
-    .lean()
-    .exec()
-    .then((matches) => {
-      matches.forEach((match) => {
-        // eslint-disable-next-line no-param-reassign
-        match.tags = match.tags || [];
-      }); // put a default value if `tags` field is absent
-      return matches;
-    })
-    .then((matches) => response.json(matches))
-    .catch((err) => sendErrorResponse(response, err, responses.matches.index.err, request.user));
+});
+
+/**
+ * GET tags listing.
+ */
+router.get('/tags', authenticateJwt(), async (request, response) => {
+  try {
+    const aggregation = await Match.aggregate()
+      .match({creator: request.user._id})
+      .group({
+        _id: 0,
+        tags: {$push: '$tags'},
+      })
+      .project({
+        tags: {
+          $reduce: {
+            input: '$tags',
+            initialValue: [],
+            in: {$setUnion: ['$$value', '$$this']},
+          },
+        },
+      })
+      .exec();
+    const tags = !aggregation || !aggregation.length ? {tags: []} : aggregation[0];
+    response.json(tags.tags);
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.tags.err, request.user);
+  }
+});
+
+router.get('/:id', async (request, response) => {
+  try {
+    const match = await Match
+      .findOne({_id: request.params.id})
+      .populate('team1')
+      .populate('team2')
+      .populate('team1Captain')
+      .populate('team2Captain')
+      .populate('team1Players')
+      .populate('team2Players')
+      .lean()
+      .exec();
+    // eslint-disable-next-line no-param-reassign
+    match.tags = match.tags || []; // put a default value if `tags` field is absent
+    response.json(match);
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.get.err, request.user);
+  }
 });
 
 /**
@@ -860,6 +834,45 @@ router.post('/', authenticateJwt(), matchCreateValidations, async (request, resp
       });
   } catch (err) {
     sendErrorResponse(response, err, responses.matches.create.err, request.user);
+  }
+});
+
+router.put('/:id', authenticateJwt(), matchEditValidations, async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error404(errors.array());
+    }
+
+    const {
+      name, team1, team2, umpire1, umpire2, umpire3, overs, tags,
+    } = request.body;
+
+    const updatedMatch = await Match
+      .findOneAndUpdate({
+        _id: ObjectId(request.params.id),
+        creator: request.user._id,
+      }, {
+        name,
+        team1,
+        team2,
+        umpire1,
+        umpire2,
+        umpire3,
+        overs,
+        tags,
+      }, {new: true});
+
+    if (!updatedMatch) {
+      throw new Error404(responses.matches.get.err);
+    }
+    response.json({
+      success: true,
+      message: responses.matches.edit.ok(name),
+      match: pick(updatedMatch, ['_id', 'name', 'team1', 'team2', 'umpire1', 'umpire2', 'umpire3', 'overs', 'tags']),
+    });
+  } catch (err) {
+    sendErrorResponse(response, err, responses.matches.edit.err, request.user);
   }
 });
 
