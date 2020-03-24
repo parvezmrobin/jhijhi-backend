@@ -3,8 +3,8 @@ const createError = require('http-errors');
 const cors = require('cors');
 const onFinished = require('on-finished');
 
-const logger = require('./lib/logger');
 require('dotenv').config();
+const logger = require('./lib/logger');
 const indexRouter = require('./controllers/index');
 const authRouter = require('./controllers/auth');
 const playersRouter = require('./controllers/players');
@@ -21,12 +21,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors());
 
-app.use(function (request, response, next) {
+app.use((request, response, next) => {
   const ping = Date.now();
   onFinished(response, (err) => {
     const pong = Date.now();
     const elapsed = (pong - ping) / 1000;
-    logger.info(`${(new Date()).toUTCString()} | ${request.method} ${request.originalUrl} ${response.statusCode} ${elapsed.toFixed(2)}s`, request.body, response.body);
+    logger.info(`${(new Date()).toUTCString()} | ${request.method} ${request.originalUrl} ${
+      response.statusCode
+    } ${elapsed.toFixed(2)}s`, request.body, response.body);
     if (err) {
       logger.error(err);
     }
@@ -41,6 +43,12 @@ app.use(authentication());
  * @property {User} user
  */
 
+app.all('/ping', (req, res) => {
+  res.send({
+    message: 'pong',
+  });
+});
+
 app.use('/api', indexRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/players', playersRouter);
@@ -49,24 +57,24 @@ app.use('/api/matches', matchesRouter);
 app.use('/api/umpires', umpiresRouter);
 
 // catch 404 and forward to error handler
-app.use(function (req, res, next) {
+app.use((req, res, next) => {
   next(createError(404));
 });
 
 // error handler
 // noinspection JSUnusedLocalSymbols
-app.use(function (err, req, res, next) {
+app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   logger.error({error: err, user: req.user});
 
   // generate the error
   res.status(err.status || 500);
   const error = {};
 
-  Object.getOwnPropertyNames(err).forEach(function (key) {
+  Object.getOwnPropertyNames(err).forEach((key) => {
     error[key] = err[key];
   });
 
-  error.stack = error.stack.split("\n").map(str => str.trim());
+  error.stack = error.stack.split('\n').map((str) => str.trim());
 
   // only providing error in development
   res.json({
