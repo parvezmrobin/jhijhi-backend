@@ -599,7 +599,7 @@ describe('Test Match Functionality', function matchTestSuit() {
       singles: 1,
     };
 
-    let res;
+    let res = null;
     async function makeRequest() {
       res = await chai.request(app)
         .post(`/api/matches/${matchId1}/bowl`)
@@ -922,7 +922,7 @@ describe('Test Match Functionality', function matchTestSuit() {
       singles: 1,
     };
 
-    let res;
+    let res = null;
     async function makeRequest() {
       res = await chai.request(app)
         .put(`/api/matches/${matchId1}/bowl`)
@@ -955,7 +955,57 @@ describe('Test Match Functionality', function matchTestSuit() {
   });
 
   it('should update bowls several times', async () => {
+    let payload;
 
+    const makeRequest = async () => {
+      const res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/bowl`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+      res.should.have.status(200);
+      return res.body;
+    };
+
+    const payloads = [{
+      singles: 1,
+    }, {
+      singles: 1,
+      by: 2,
+    }, {
+      by: 1,
+      legBy: 2,
+    }, {
+      boundary: {
+        kind: 'regular',
+        run: 4,
+      },
+    }, {
+      singles: 2,
+      boundary: {
+        kind: 'by',
+        run: 4,
+      },
+    }, {
+      isWicket: {
+        kind: 'Bold',
+      },
+    }, {
+      isWicket: {
+        kind: 'Run out',
+        player: 1,
+      },
+    }];
+
+    for (payload of payloads) {
+      await makeRequest();
+    }
+
+    await testAddNewOver();
+
+    payload = {
+      singles: 1,
+    };
+    await makeRequest();
   });
 
   after(async () => {
