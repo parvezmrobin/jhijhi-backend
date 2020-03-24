@@ -599,39 +599,27 @@ describe('Test Match Functionality', function matchTestSuit() {
       singles: 1,
     };
 
-    let res = await chai.request(app)
-      .post(`/api/matches/${matchId1}/bowl`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send(bowlPayload);
+    let res;
+    async function makeRequest() {
+      res = await chai.request(app)
+        .post(`/api/matches/${matchId1}/bowl`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(bowlPayload);
+    }
 
+    await makeRequest();
     res.should.have.status(400);
     res.body.err[0].param.should.be.equals('playedBy');
 
     bowlPayload.playedBy = null;
-    res = await chai.request(app)
-      .post(`/api/matches/${matchId1}/bowl`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send(bowlPayload);
-
+    await makeRequest();
     res.should.have.status(400);
     res.body.err[0].param.should.be.equals('playedBy');
   });
 
-  it('should not add bowl with invalid combination of values', async () => {
-    let payload = {
-      playedBy: 0,
-      singles: 'spd',
-    };
+  async function testMutateBowl(payload, addBowl) {
+    /* eslint-disable no-param-reassign */
     let errorParams;
-    const addBowl = async () => {
-      const res = await chai.request(app)
-        .post(`/api/matches/${matchId1}/bowl`)
-        .set('Authorization', `Bearer ${token1}`)
-        .send(payload);
-      res.should.have.status(400);
-      return res.body.err.map((e) => e.param);
-    };
-
     for (const singles of ['spd', -1]) {
       payload.singles = singles;
       errorParams = await addBowl();
@@ -653,26 +641,27 @@ describe('Test Match Functionality', function matchTestSuit() {
       errorParams.should.have.members(['singles']);
     }
 
-    payload = {
+    /* payload = {
       playedBy: 0,
       singles: 1,
       isWide: true,
-    };
+    }; */
+    delete payload.boundary;
+    payload.isWide = true;
     errorParams = await addBowl();
     errorParams.should.have.members(['singles']);
 
-    payload = {
-      playedBy: 0,
-    };
+    /* payload = {playedBy: 0}; */
+    delete payload.singles;
+    delete payload.isWide;
     for (const by of ['spd', -1]) {
       payload.by = by;
       errorParams = await addBowl();
       errorParams.should.have.members(['by']);
     }
 
-    payload = {
-      playedBy: 0,
-    };
+    /* payload = {playedBy: 0}; */
+    delete payload.by;
     for (const legBy of ['spd', -1]) {
       payload.legBy = legBy;
       errorParams = await addBowl();
@@ -684,12 +673,16 @@ describe('Test Match Functionality', function matchTestSuit() {
     errorParams = await addBowl();
     errorParams.should.have.members(['legBy']);
 
-    payload = {
+    /* payload = {
       playedBy: 0,
       legBy: 1,
       boundary: {
         run: 4,
       },
+    }; */
+    delete payload.isWide;
+    payload.boundary = {
+      run: 4,
     };
     for (const boundaryKind of ['regular', 'legBy']) {
       payload.boundary.kind = boundaryKind;
@@ -697,40 +690,51 @@ describe('Test Match Functionality', function matchTestSuit() {
       errorParams.should.have.members(['legBy']);
     }
 
-    payload = {
+    /* payload = {
       playedBy: 0,
       isWide: true,
       boundary: {
         run: 4,
       },
-    };
+    }; */
+    delete payload.legBy;
+    payload.isWide = true;
     for (const boundaryKind of ['regular', 'legBy']) {
       payload.boundary.kind = boundaryKind;
       errorParams = await addBowl();
       errorParams.should.have.members(['boundary']);
     }
 
-    payload = {
+    /* payload = {
       playedBy: 0,
       isNo: true,
-    };
+    }; */
+    delete payload.boundary;
+    delete payload.isWide;
+    payload.isNo = true;
     errorParams = await addBowl();
     errorParams.should.have.members(['isNo']);
-  });
+    return payload;
+  }
 
-  it('should not add bowl with invalid wicket', async () => {
-    let payload = {
+  it('should not add bowl with invalid combination of values', async () => {
+    const payload = {
       playedBy: 0,
-      isWicket: {
-        kind: 1,
-      },
+      singles: 'spd',
+    };
+    const addBowl = async () => {
+      const res = await chai.request(app)
+        .post(`/api/matches/${matchId1}/bowl`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+      res.should.have.status(400);
+      return res.body.err.map((e) => e.param);
     };
 
-    const makeRequest = () => chai.request(app)
-      .post(`/api/matches/${matchId1}/bowl`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send(payload);
+    await testMutateBowl(payload, addBowl);
+  });
 
+  async function testWicketValidation(makeRequest, payload) {
     let res = await makeRequest();
     res.should.have.status(400);
     res.body.err[0].param.should.contain('isWicket');
@@ -761,12 +765,13 @@ describe('Test Match Functionality', function matchTestSuit() {
     res.body.err[0].msg.should.match(/bold/i);
     res.body.err[0].msg.should.match(/no bowl/i);
 
-    payload = {
+    /* payload = {
       playedBy: 0,
       isWicket: {
         kind: 'Bold',
       },
-    };
+    }; */
+    delete payload.isNo;
 
     let lastScoreType = null;
     for (const scoreType of ['singles', 'by', 'legBy']) {
@@ -780,7 +785,7 @@ describe('Test Match Functionality', function matchTestSuit() {
       res.body.err[0].msg.should.match(/cannot take.*run/i);
     }
 
-    payload = {
+    /* payload = {
       playedBy: 0,
       isWicket: {
         kind: 'Bold',
@@ -789,12 +794,34 @@ describe('Test Match Functionality', function matchTestSuit() {
         kind: 'regular',
         run: 4,
       },
+    }; */
+    delete payload.legBy;
+    payload.boundary = {
+      kind: 'regular',
+      run: 4,
     };
     res = await makeRequest();
     res.should.have.status(400);
     res.body.err[0].param.should.contain('isWicket');
     res.body.err[0].msg.should.match(/wicket/i);
     res.body.err[0].msg.should.match(/boundary/i);
+    return payload;
+  }
+
+  it('should not add bowl with invalid wicket', async () => {
+    const payload = {
+      playedBy: 0,
+      isWicket: {
+        kind: 1,
+      },
+    };
+
+    const makeRequest = () => chai.request(app)
+      .post(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(payload);
+
+    await testWicketValidation(makeRequest, payload);
   });
 
   it('should add several bowls to match', async () => {
@@ -857,6 +884,78 @@ describe('Test Match Functionality', function matchTestSuit() {
       singles: 1,
     };
     await makeRequest();
+  });
+
+  it('should not update bowl with invalid combination of values', async () => {
+    const payload = {
+      playedBy: 0,
+      singles: 'spd',
+    };
+    const addBowl = async () => {
+      const res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/bowl`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+      res.should.have.status(400);
+      return res.body.err.map((e) => e.param);
+    };
+
+    await testMutateBowl(payload, addBowl);
+  });
+
+  it('should not update bowl of other user', async () => {
+    const bowlPayload = {
+      playedBy: 0,
+      singles: 1,
+    };
+
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token2}`)
+      .send(bowlPayload);
+
+    res.should.have.status(404);
+  });
+
+  it('should update a bowl without `playedBy` value', async () => {
+    const bowlPayload = {
+      singles: 1,
+    };
+
+    let res;
+    async function makeRequest() {
+      res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/bowl`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(bowlPayload);
+    }
+
+    await makeRequest();
+    res.should.have.status(200);
+
+    bowlPayload.playedBy = null;
+    await makeRequest();
+    res.should.have.status(200);
+  });
+
+  it('should not update bowl with invalid wicket', async () => {
+    const payload = {
+      playedBy: 0,
+      isWicket: {
+        kind: 1,
+      },
+    };
+
+    const makeRequest = () => chai.request(app)
+      .put(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(payload);
+
+    await testWicketValidation(makeRequest, payload);
+  });
+
+  it('should update bowls several times', async () => {
+
   });
 
   after(async () => {

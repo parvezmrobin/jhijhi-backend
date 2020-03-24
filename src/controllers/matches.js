@@ -163,39 +163,6 @@ const matchTossValidations = [
     .isIn(['Bat', 'Bowl']),
 ];
 
-const uncertainOutValidations = [
-  body('batsman')
-    .isInt({min: 0}),
-  body('batsman')
-    .custom((batsman, {req}) => Match
-      .findById(req.params.id)
-      .lean()
-      .exec()
-      .then((match) => {
-        if (!match) {
-          throw new Error('Invalid match id');
-        }
-        if (['innings1', 'innings2'].indexOf(match.state) === -1) {
-          throw new Error('No runout happens before or after match.');
-        }
-
-        const {overs} = match[match.state];
-        const lastOver = overs[overs.length - 1].bowls;
-        const lastBowl = lastOver[lastOver.length - 1];
-
-        if (lastBowl.isWicket && lastBowl.isWicket.kind) {
-          const message = `Already a ${lastBowl.isWicket.kind} in this bowl. `
-            + 'To input a bowl with only a run out or obstructing the field, '
-            + 'input a bowl with 0 run first.';
-          throw new Error(message);
-        }
-
-        return true;
-      })),
-  body('kind', '`kind` should be either run out or obstructing the field')
-    .isIn(['Run out', 'Obstructing the field']),
-];
-
 const overValidation = [
   body('bowledBy', '`bowledBy` is required and should be an integer')
     .isInt({min: 0}),
@@ -206,8 +173,6 @@ const OBSTRUCTING_THE_FIELD = 'Obstructing the field';
 const UNCERTAIN_WICKETS = [RUN_OUT, OBSTRUCTING_THE_FIELD];
 
 const bowlValidations = [
-  body('playedBy', '`playedBy` is required and should be an integer')
-    .isInt({min: 0}),
   body('singles', '`singles` should be an integer')
     .optional({nullable: true})
     .isInt({min: 0})
@@ -307,6 +272,67 @@ const bowlValidations = [
 
       return true;
     }),
+];
+
+const bowlCreateValidation = [
+  ...bowlValidations,
+  body('playedBy', '`playedBy` is required and should be an integer')
+    .isInt({min: 0}),
+];
+
+const bowlEditValidation = [
+  ...bowlValidations,
+  body('overNo', '`overNo` must be a non-negative integer')
+    .optional({nullable: true})
+    .isInt({min: 0})
+    .custom((overNo, {req}) => {
+      if (overNo && !req.body.bowlNo) {
+        throw new Error('Must provide either both `overNo` and `bowlNo` or none');
+      }
+      return true;
+    }),
+  body('bowlNo', '`bowlNo` must be a non-negative integer')
+    .optional({nullable: true})
+    .isInt({min: 0})
+    .custom((bowlNo, {req}) => {
+      if (bowlNo && !req.body.overNo) {
+        throw new Error('Must provide either both `overNo` and `bowlNo` or none');
+      }
+      return true;
+    }),
+];
+
+const uncertainOutValidations = [
+  body('batsman')
+    .isInt({min: 0}),
+  body('batsman')
+    .custom((batsman, {req}) => Match
+      .findById(req.params.id)
+      .lean()
+      .exec()
+      .then((match) => {
+        if (!match) {
+          throw new Error('Invalid match id');
+        }
+        if (['innings1', 'innings2'].indexOf(match.state) === -1) {
+          throw new Error('No runout happens before or after match.');
+        }
+
+        const {overs} = match[match.state];
+        const lastOver = overs[overs.length - 1].bowls;
+        const lastBowl = lastOver[lastOver.length - 1];
+
+        if (lastBowl.isWicket && lastBowl.isWicket.kind) {
+          const message = `Already a ${lastBowl.isWicket.kind} in this bowl. `
+            + 'To input a bowl with only a run out or obstructing the field, '
+            + 'input a bowl with 0 run first.';
+          throw new Error(message);
+        }
+
+        return true;
+      })),
+  body('kind', '`kind` should be either run out or obstructing the field')
+    .isIn(['Run out', 'Obstructing the field']),
 ];
 
 router.put('/:id/begin', authenticateJwt(), matchBeginValidations, async (request, response) => {
@@ -471,7 +497,7 @@ router.post('/:id/over', [authenticateJwt(), overValidation], async (request, re
   }
 });
 
-router.post('/:id/bowl', [authenticateJwt(), bowlValidations], async (request, response) => {
+router.post('/:id/bowl', [authenticateJwt(), bowlCreateValidation], async (request, response) => {
   try {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
@@ -522,7 +548,7 @@ router.post('/:id/bowl', [authenticateJwt(), bowlValidations], async (request, r
   }
 });
 
-const _updateBowlAndSend = (match, bowl, response, overNo, bowlNo) => {
+const _updateBowlAndSend = (response, match, bowl, overNo, bowlNo) => {
   const overExists = Number.isInteger(overNo);
   const bowlExists = Number.isInteger(bowlNo);
   if ((overExists || bowlExists) && !(overExists && bowlExists)) {
@@ -573,7 +599,7 @@ const _updateBowlAndSend = (match, bowl, response, overNo, bowlNo) => {
     });
 };
 
-router.put('/:id/bowl', authenticateJwt(), async (request, response) => {
+router.put('/:id/bowl', [authenticateJwt(), bowlEditValidation], async (request, response) => {
   try {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
@@ -591,8 +617,8 @@ router.put('/:id/bowl', authenticateJwt(), async (request, response) => {
       throw new Error404(responses.matches.get.err);
     }
 
-    const {bowl, overNo, bowlNo} = nullEmptyValues(request);
-    await _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
+    const {overNo, bowlNo, ...bowl} = nullEmptyValues(request);
+    await _updateBowlAndSend(response, match, bowl, overNo, bowlNo);
   } catch (err) {
     sendErrorResponse(response, err, 'Error while updating bowl', request.user);
   }
@@ -617,7 +643,7 @@ router.put('/:id/by', authenticateJwt(), async (request, response) => {
         kind: 'by',
       },
     };
-    await _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
+    await _updateBowlAndSend(response, match, bowl, overNo, bowlNo);
   } catch (err) {
     sendErrorResponse(response, err, 'Error while updating bowl', request.user);
   }
@@ -648,7 +674,7 @@ router.put('/:id/uncertain-out', [uncertainOutValidations, authenticateJwt()], a
         player: batsman,
       },
     };
-    await _updateBowlAndSend(match, bowl, response, overNo, bowlNo);
+    await _updateBowlAndSend(response, match, bowl, overNo, bowlNo);
   } catch (err) {
     sendErrorResponse(response, err, 'Error while adding out', request.user);
   }
