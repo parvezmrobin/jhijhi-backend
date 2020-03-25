@@ -16,7 +16,7 @@ const inningsSchema = new Schema({
       required: true,
       min: 0,
     },
-    bowls: [{
+    bowls: [new Schema({
       playedBy: {
         type: Number,
         required: true,
@@ -51,9 +51,9 @@ const inningsSchema = new Schema({
       },
       isWide: Boolean,
       isNo: String, // containing the reason of no
-    }],
+    }, {_id: false})],
   }],
-}, schemaOptions);
+}, {_id: false});
 
 module.exports = new Schema({
   name: String,

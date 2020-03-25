@@ -174,7 +174,7 @@ const UNCERTAIN_WICKETS = [RUN_OUT, OBSTRUCTING_THE_FIELD];
 
 const bowlValidations = [
   body('singles', '`singles` should be an integer')
-    .optional({nullable: true})
+    .optional()
     .isInt({min: 0})
     .custom((singles, {req}) => {
       if (singles === 0) {
@@ -198,10 +198,10 @@ const bowlValidations = [
       return true;
     }),
   body('by', '`by` should be an integer')
-    .optional({nullable: true})
+    .optional()
     .isInt({min: 0}),
   body('legBy', '`legBy` should be an integer')
-    .optional({nullable: true})
+    .optional()
     .isInt({min: 0})
     .custom((legBy, {req}) => {
       if (legBy === 0) {
@@ -220,7 +220,7 @@ const bowlValidations = [
       return true;
     }),
   body('boundary')
-    .optional({nullable: true})
+    .optional()
     .custom((boundary, {req}) => {
       if (!Object.keys(boundary).length) {
         return true;
@@ -234,13 +234,13 @@ const bowlValidations = [
       return true;
     }),
   body('isWide', '`isWide` should be a boolean')
-    .optional({nullable: true})
+    .optional()
     .isBoolean(),
   body('isNo', '`isNo` should be a string')
-    .optional({nullable: true})
+    .optional()
     .isString(),
   body('isWicket')
-    .optional({nullable: true})
+    .optional()
     .custom((isWicket, {req}) => {
       if (!Object.keys(isWicket).length) {
         return true;
@@ -282,20 +282,23 @@ const bowlCreateValidation = [
 
 const bowlEditValidation = [
   ...bowlValidations,
+  body('playedBy', '`playedBy` is required and should be an integer')
+    .optional()
+    .isInt({min: 0}),
   body('overNo', '`overNo` must be a non-negative integer')
-    .optional({nullable: true})
+    .optional()
     .isInt({min: 0})
     .custom((overNo, {req}) => {
-      if (overNo && !req.body.bowlNo) {
+      if (overNo && !Number.isInteger(req.body.bowlNo)) {
         throw new Error('Must provide either both `overNo` and `bowlNo` or none');
       }
       return true;
     }),
   body('bowlNo', '`bowlNo` must be a non-negative integer')
-    .optional({nullable: true})
+    .optional()
     .isInt({min: 0})
     .custom((bowlNo, {req}) => {
-      if (bowlNo && !req.body.overNo) {
+      if (bowlNo && !Number.isInteger(req.body.overNo)) {
         throw new Error('Must provide either both `overNo` and `bowlNo` or none');
       }
       return true;
@@ -373,14 +376,6 @@ router.put('/:id/begin', authenticateJwt(), matchBeginValidations, async (reques
       .populate('team1Players')
       .populate('team2Players')
       .execPopulate();
-    Logger.amplitude(Events.Match.Begin, request.user._id, {
-      match_id: match._id,
-      team1Captain,
-      team2Captain,
-      team1Players,
-      team2Players,
-      state,
-    });
     response.json({
       success: true,
       message: responses.matches.begin.ok,
@@ -391,6 +386,15 @@ router.put('/:id/begin', authenticateJwt(), matchBeginValidations, async (reques
         team2Players: match.team2Players,
         state: 'toss',
       },
+    });
+
+    await Logger.amplitude(Events.Match.Begin, request.user._id, {
+      match_id: match._id,
+      team1Captain,
+      team2Captain,
+      team1Players,
+      team2Players,
+      state,
     });
   } catch (err) {
     sendErrorResponse(response, err, responses.matches.begin.err, request.user);
@@ -425,10 +429,6 @@ router.put('/:id/toss', [authenticateJwt(), matchTossValidations], async (reques
     match.innings1 = {overs: []};
     await match.save();
 
-    const amplitudeEvent = pick(match.toObject(), ['team1WonToss', 'team1BatFirst', 'state']);
-    Object.assign(amplitudeEvent, {won, choice, state});
-    Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
-
     response.json({
       success: true,
       message: responses.matches.toss.ok,
@@ -439,6 +439,10 @@ router.put('/:id/toss', [authenticateJwt(), matchTossValidations], async (reques
         innings1: {overs: []},
       },
     });
+
+    const amplitudeEvent = pick(match.toObject(), ['team1WonToss', 'team1BatFirst', 'state']);
+    Object.assign(amplitudeEvent, {won, choice, state});
+    await Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
   } catch (err) {
     sendErrorResponse(response, err, responses.matches.toss.err, request.user);
   }
@@ -491,7 +495,7 @@ router.post('/:id/over', [authenticateJwt(), overValidation], async (request, re
       match_id: match._id,
       overIndex: innings.overs.length,
     };
-    Logger.amplitude(Events.Match.Over, response.req.user._id, amplitudeEvent);
+    await Logger.amplitude(Events.Match.Over, response.req.user._id, amplitudeEvent);
   } catch (e) {
     sendErrorResponse(response, e, 'Error while saving over', request.user);
   }
@@ -517,19 +521,29 @@ router.post('/:id/bowl', [authenticateJwt(), bowlCreateValidation], async (reque
     }
 
     const bowl = nullEmptyValues(request);
-    let updateQuery;
-    if (match.state === 'innings1') {
-      updateQuery = {
-        $push: {[`innings1.overs.${match.innings1.overs.length - 1}.bowls`]: bowl},
-      };
-    } else if (match.state === 'innings2') {
-      updateQuery = {
-        $push: {[`innings2.overs.${match.innings2.overs.length - 1}.bowls`]: bowl},
-      };
-    } else {
-      const error = {status: 400, message: `Cannot add bowl in state ${match.state}`};
-      throw error;
+    if (!['innings1', 'innings2'].includes(match.state)) {
+      throw new Error400([{
+        location: 'body',
+        param: null,
+        value: null,
+        msg: `Cannot add bowl in state ${match.state}`,
+      }]);
     }
+    const overIndex = match[match.state].overs.length - 1;
+    if (overIndex === -1) {
+      throw new Error400([{
+        location: 'body',
+        param: null,
+        value: null,
+        msg: `Cannot add bowl before adding over to ${match.state}`,
+      }]);
+    }
+    const keyForBowlArray = `${match.state}.overs.${overIndex}.bowls`;
+    const updateQuery = {
+      $push: {
+        [keyForBowlArray]: bowl,
+      },
+    };
 
     await match.updateOne(updateQuery)
       .exec();
@@ -542,24 +556,19 @@ router.post('/:id/bowl', [authenticateJwt(), bowlCreateValidation], async (reque
       bowlIndex: innings.overs[innings.overs.length - 1].bowls.length,
     };
     Object.assign(amplitudeEvent, bowl);
-    Logger.amplitude(Events.Match.Bowl.Create, request.user._id, amplitudeEvent);
+    await Logger.amplitude(Events.Match.Bowl.Create, request.user._id, amplitudeEvent);
   } catch (err) {
     sendErrorResponse(response, err, 'Error while saving bowl', request.user);
   }
 });
 
-const _updateBowlAndSend = (response, match, bowl, overNo, bowlNo) => {
+async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo) {
   const overExists = Number.isInteger(overNo);
   const bowlExists = Number.isInteger(bowlNo);
   if ((overExists || bowlExists) && !(overExists && bowlExists)) {
     // provided either `overNo` or `bowlNo` but not both.
-    return sendErrorResponse(
-      response,
-      {statusCode: 400},
-      'Must provide either both `overNo` and `bowlNo` or none',
-    );
+    throw new Error400([], 'Must provide either both `overNo` and `bowlNo` or none');
   }
-  let field;
   let prevBowl; // if `overNo` and `bowlNo` is not provided, then update the last bowl
   if (match.state === 'innings1') {
     const {overs} = match.innings1;
@@ -567,37 +576,47 @@ const _updateBowlAndSend = (response, match, bowl, overNo, bowlNo) => {
     const {bowls} = overs[overNo];
     bowlNo = bowlExists ? bowlNo : bowls.length - 1; // eslint-disable-line no-param-reassign
     prevBowl = bowls[bowlNo];
-    field = `innings1.overs.${overNo}.bowls.${bowlNo}`;
   } else if (match.state === 'innings2') {
     const {overs} = match.innings2;
     overNo = overExists ? overNo : overs.length - 1; // eslint-disable-line no-param-reassign
     const {bowls} = overs[overNo];
     bowlNo = bowlExists ? bowlNo : bowls.length - 1; // eslint-disable-line no-param-reassign
     prevBowl = bowls[bowlNo];
-    field = `innings2.overs.${overNo}.bowls.${bowlNo}`;
   } else {
-    return sendErrorResponse(response, {statusCode: 400}, 'State should be either innings 1 or innings 2');
+    throw new Error400([], 'State should be either innings 1 or innings 2');
   }
-  const updateQuery = {$set: {[field]: {...prevBowl, ...bowl}}};
+  if (!prevBowl) {
+    throw new Error400([{
+      location: 'body',
+      param: 'bowlNo',
+      value: bowlNo,
+      overNo,
+      msg: `There is no bowl at over ${overNo}, bowl ${bowlNo}`,
+    }]);
+  }
+  const field = `${match.state}.overs.${overNo}.bowls.${bowlNo}`;
 
-  return Match.findByIdAndUpdate(match._id, updateQuery)
-    .exec()
-    .then(() => {
-      const innings = match[match.state];
-      const amplitudeEvent = {
-        match_id: match._id,
-        overIndex: innings.overs.length - 1,
-        bowlIndex: innings.overs[innings.overs.length - 1].bowls.length,
-      };
-      Object.assign(amplitudeEvent, bowl);
-      Logger.amplitude(Events.Match.Bowl.Create, response.req.user._id, amplitudeEvent);
+  const updateQuery = {$set: {[field]: {playedBy: prevBowl.playedBy, ...bowl}}};
 
-      return response.json({
-        success: true,
-        bowl,
-      });
-    });
-};
+  await Match.findByIdAndUpdate(match._id, updateQuery)
+    .exec();
+  response.json({
+    success: true,
+    innings: match.state,
+    overIndex: overNo,
+    bowlIndex: bowlNo,
+    bowl,
+  });
+
+  const amplitudeEvent = {
+    match_id: match._id,
+    innings: match.state,
+    overIndex: overNo,
+    bowlIndex: bowlNo,
+  };
+  Object.assign(amplitudeEvent, bowl);
+  await Logger.amplitude(Events.Match.Bowl.Create, response.req.user._id, amplitudeEvent);
+}
 
 router.put('/:id/bowl', [authenticateJwt(), bowlEditValidation], async (request, response) => {
   try {
@@ -718,11 +737,10 @@ router.put('/:id/declare', authenticateJwt(), async (request, response) => {
     }
     updateState.state = match.state;
     await match.save();
+    response.json(updateState);
 
     const amplitudeEvent = {match_id: match._id, ...updateState};
-    Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
-
-    response.json(updateState);
+    await Logger.amplitude(Events.Match.Begin, request.user._id, amplitudeEvent);
   } catch (err) {
     sendErrorResponse(response, err, responses.matches.get.err, request.user);
   }
@@ -849,8 +867,6 @@ router.post('/', authenticateJwt(), matchCreateValidations, async (request, resp
       creator: request.user._id,
     });
 
-    Logger.amplitude(Events.Match.Bowl.Create, response.req.user._id, createdMatch);
-
     response
       .status(201)
       .json({
@@ -858,6 +874,8 @@ router.post('/', authenticateJwt(), matchCreateValidations, async (request, resp
         message: responses.matches.create.ok(name),
         match: createdMatch,
       });
+
+    await Logger.amplitude(Events.Match.Bowl.Create, response.req.user._id, createdMatch);
   } catch (err) {
     sendErrorResponse(response, err, responses.matches.create.err, request.user);
   }

@@ -43,6 +43,11 @@ app.use(authentication());
  * @property {User} user
  */
 
+/**
+ * @namespace express.Request
+ * @property {User} user
+ */
+
 app.all('/ping', (req, res) => {
   res.send({
     message: 'pong',

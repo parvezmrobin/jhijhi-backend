@@ -45,17 +45,20 @@ if (process.env.NODE_ENV !== 'production') {
   logger.add(consoleTransport);
 }
 
-function amplitude(eventName, userId, data, time) {
+async function amplitude(eventName, userId, data, time) {
   // eslint-disable-next-line no-param-reassign
   time = Number(time || new Date());
-  return axios
-    .post('https://api.amplitude.com/2/httpapi', {
-      api_key: process.env.AMPLITUDE_KEY,
-      events: [{
-        event_type: eventName, user_id: userId, event_properties: data, time,
-      }],
-    })
-    .catch((err) => logger.error('Error Amplitude:', {err: err.response && err.response.data}));
+  try {
+    await axios
+      .post('https://api.amplitude.com/2/httpapi', {
+        api_key: process.env.AMPLITUDE_KEY,
+        events: [{
+          event_type: eventName, user_id: userId, event_properties: data, time,
+        }],
+      });
+  } catch (err) {
+    logger.error('Error Amplitude:', {err: err.response && err.response.data});
+  }
 }
 
 module.exports = logger;
