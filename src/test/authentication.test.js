@@ -1,6 +1,9 @@
-const { describe } = require('mocha');
+const {
+  describe, it, after,
+} = require('mocha');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
+
 chai.should();
 process.env.IS_TEST = true;
 const app = require('../app');
@@ -8,7 +11,8 @@ const User = require('../models/user');
 
 chai.use(chaiHttp);
 
-describe('Test JWT authentication', function testSuit() {
+describe('Test JWT authentication', function authenticationTestSuit() {
+  this.timeout(10000);
   let token;
 
   it('should make a new user', async () => {
@@ -35,7 +39,7 @@ describe('Test JWT authentication', function testSuit() {
     res.should.have.status(200);
     res.body.success.should.be.equals(true);
     res.body.token.should.be.a('string');
-    token = res.body.token;
+    ({token} = res.body);
   });
 
   it('should authenticate using token', async () => {
