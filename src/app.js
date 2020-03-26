@@ -2,16 +2,16 @@ const express = require('express');
 const createError = require('http-errors');
 const cors = require('cors');
 const onFinished = require('on-finished');
-
 require('dotenv').config();
+
 const logger = require('./lib/logger');
-const indexRouter = require('./controllers/index');
-const authRouter = require('./controllers/auth');
-const playersRouter = require('./controllers/players');
-const teamsRouter = require('./controllers/teams');
-const matchesRouter = require('./controllers/matches');
-const umpiresRouter = require('./controllers/umpires');
 const authentication = require('./authentication');
+const IndexRouter = require('./controllers/IndexController');
+const AuthRouter = require('./controllers/AuthController');
+const PlayerRouter = require('./controllers/PlayerController');
+const TeamRouter = require('./controllers/TeamController');
+const MatchRouter = require('./controllers/MatchController');
+const UmpireRouter = require('./controllers/UmpireController');
 
 const app = express();
 
@@ -54,12 +54,12 @@ app.all('/ping', (req, res) => {
   });
 });
 
-app.use('/api', indexRouter);
-app.use('/api/auth', authRouter);
-app.use('/api/players', playersRouter);
-app.use('/api/teams', teamsRouter);
-app.use('/api/matches', matchesRouter);
-app.use('/api/umpires', umpiresRouter);
+app.use('/api', IndexRouter);
+app.use('/api/auth', AuthRouter);
+app.use('/api/players', PlayerRouter);
+app.use('/api/teams', TeamRouter);
+app.use('/api/matches', MatchRouter);
+app.use('/api/umpires', UmpireRouter);
 
 // catch 404 and forward to error handler
 app.use((req, res, next) => {
