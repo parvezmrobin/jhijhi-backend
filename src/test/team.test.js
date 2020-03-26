@@ -1,4 +1,6 @@
-const { describe } = require('mocha');
+const {
+  describe, before, it, after,
+} = require('mocha');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 
@@ -246,7 +248,6 @@ describe('Test Team Functionality', function teamTestSuit() {
         players: [player1, player2],
       });
     res.should.have.status(201);
-    console.log(res.body);
     const {preset} = res.body;
     preset.name.should.be.equals('Team'); // name is auto-capitalized
     preset.players[0].should.be.equals(player1); // short name is auto-capitalized
