@@ -954,7 +954,7 @@ describe('Test Match Functionality', function matchTestSuit() {
     await makeRequest();
   });
 
-  async function testMatch1DataIntegrityWithBowls(currentOver2Bowls) {
+  async function testMatch1DataIntegrityWithBowls(currentOver2Bowls, currentOver3Bowls = []) {
     const match1 = await testMatch1DataIntegrity(true, 'innings1');
     match1.innings1.overs[0].bowledBy.should.be.equals(0);
     match1.innings1.overs[1].bowledBy.should.be.equals(0);
@@ -965,6 +965,10 @@ describe('Test Match Functionality', function matchTestSuit() {
     for (let i = 0; i < currentOver2Bowls.length; i++) {
       const over2Bowl = currentOver2Bowls[i];
       match1.innings1.overs[1].bowls[i].should.deep.include(over2Bowl);
+    }
+    for (let i = 0; i < currentOver3Bowls.length; i++) {
+      const over3Bowl = currentOver3Bowls[i];
+      match1.innings1.overs[2].bowls[i].should.deep.include(over3Bowl);
     }
   }
 
@@ -1163,6 +1167,154 @@ describe('Test Match Functionality', function matchTestSuit() {
       .send(payload);
     res.should.have.status(400);
     res.body.err[0].should.contain({param: 'bowlNo', value: -1});
+  });
+
+  it('should add by runs', async () => {
+    // new bowl will be added on over: 2, bowl: 0
+    let payload = {
+      playedBy: 2,
+      singles: 1,
+    };
+    const addBowl = () => chai.request(app)
+      .post(`/api/matches/${matchId1}/bowl`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send(payload);
+
+    for (let i = 0; i < 4; i++) {
+      await addBowl();
+    }
+
+    payload = {run: 2};
+    const addByRun = async () => {
+      const _res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/by`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+      _res.should.have.status(200);
+      return _res.body;
+    };
+
+    const byRunResponse = await addByRun();
+    byRunResponse.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 3});
+    byRunResponse.bowl.should.contain({playedBy: 2, singles: 1, by: 2});
+
+    payload = {run: 4, boundary: true};
+    const byBoundaryResponse = await addByRun();
+    byBoundaryResponse.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 3});
+    byBoundaryResponse.bowl.should.deep.contain({
+      playedBy: 2,
+      singles: 1,
+      by: 2,
+      boundary: {
+        kind: 'by',
+        run: 4,
+      },
+    });
+
+    payload = {run: 4, overNo: 2, bowlNo: 0};
+    const byBoundaryResponseWithIndices = await addByRun();
+    byBoundaryResponseWithIndices.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 0});
+    byBoundaryResponseWithIndices.bowl.should.deep.contain({
+      playedBy: 2,
+      singles: 1,
+      by: 4,
+    });
+  });
+
+  it('should not add uncertain wickets without necessary values', async () => {
+    const payload = {
+      batsman: 2,
+      kind: 'Run out',
+    };
+    for (const payloadKey in payload) {
+      const res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/uncertain-out`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send({...payload, [payloadKey]: undefined});
+      res.should.have.status(400);
+      res.body.err[0].param.should.be.equals(payloadKey);
+    }
+    const res = await chai.request(app)
+      .put(`/api/matches/${matchId1}/uncertain-out`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({...payload, kind: 'Bold'});
+    res.should.have.status(400);
+    res.body.err[0].param.should.be.equals('kind');
+  });
+
+  it('should add uncertain wickets', async () => {
+    let payload;
+    const addUncertainWicket = async () => {
+      const _res = await chai.request(app)
+        .put(`/api/matches/${matchId1}/uncertain-out`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send(payload);
+      _res.should.have.status(200);
+      return _res.body;
+    };
+
+    payload = {
+      batsman: 2,
+      kind: 'Run out',
+    };
+    let responseBody = await addUncertainWicket();
+    responseBody.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 3});
+    responseBody.bowl.should.deep.contain({
+      isWicket: {player: 2, kind: 'Run out'},
+      playedBy: 2,
+      singles: 1,
+      by: 2,
+      boundary: {kind: 'by', run: 4},
+    });
+
+    payload = {
+      batsman: 1,
+      kind: 'Run out',
+      overNo: 2,
+      bowlNo: 1,
+    };
+    responseBody = await addUncertainWicket();
+    responseBody.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 1});
+    responseBody.bowl.should.deep.contain({
+      isWicket: {player: 1, kind: 'Run out'},
+      playedBy: 2,
+      singles: 1,
+    });
+  });
+
+  it('should have proper data after updating bowls', async () => {
+    const currentOver2Bowls = [{
+      playedBy: over2Bowls[0].playedBy,
+      singles: 0, // caused by last iteration of test - should update bowl with `overNo` and `bowlNo`
+      by: 0,
+      legBy: 0,
+    }];
+    const currentOver3Bowls = [{
+      playedBy: 2,
+      singles: 1,
+      by: 4,
+      legBy: 0,
+    }, {
+      isWicket: {player: 1, kind: 'Run out'},
+      playedBy: 2,
+      singles: 1,
+      by: 0,
+      legBy: 0,
+    }, {
+      playedBy: 2,
+      singles: 1,
+      by: 0,
+      legBy: 0,
+    }, {
+      playedBy: 2,
+      singles: 1,
+      by: 2,
+      boundary: {
+        kind: 'by',
+        run: 4,
+      },
+    }];
+    await testMatch1DataIntegrityWithBowls(currentOver2Bowls, currentOver3Bowls);
   });
 
   after(async () => {

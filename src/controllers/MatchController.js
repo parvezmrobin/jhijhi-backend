@@ -280,11 +280,7 @@ const bowlCreateValidation = [
     .isInt({min: 0}),
 ];
 
-const bowlEditValidation = [
-  ...bowlValidations,
-  body('playedBy', '`playedBy` is required and should be an integer')
-    .optional()
-    .isInt({min: 0}),
+const overNoAndBowlNoValidation = [
   body('overNo', '`overNo` must be a non-negative integer')
     .optional()
     .isInt({min: 0})
@@ -304,8 +300,30 @@ const bowlEditValidation = [
       return true;
     }),
 ];
+const bowlEditValidation = [
+  ...bowlValidations,
+  ...overNoAndBowlNoValidation,
+  body('playedBy', '`playedBy` is required and should be an integer')
+    .optional()
+    .isInt({min: 0}),
+];
+
+const byRunValidations = [
+  ...overNoAndBowlNoValidation,
+  body('boundary')
+    .optional()
+    .isBoolean(),
+  body('run')
+    .custom((run, {req}) => {
+      if (req.body.boundary && ![4, 6].includes(run)) {
+        throw new Error('Boundary run can either be 4 or 6');
+      }
+      return true;
+    }),
+];
 
 const uncertainOutValidations = [
+  ...overNoAndBowlNoValidation,
   body('batsman')
     .isInt({min: 0}),
   body('batsman')
@@ -322,11 +340,13 @@ const uncertainOutValidations = [
         }
 
         const {overs} = match[match.state];
-        const lastOver = overs[overs.length - 1].bowls;
-        const lastBowl = lastOver[lastOver.length - 1];
+        const overNo = req.body.overNo || overs.length - 1;
+        const lastOver = overs[overNo].bowls;
+        const bowlNo = req.body.bowlNo || lastOver.length - 1;
+        const existingBowl = lastOver[bowlNo];
 
-        if (lastBowl.isWicket && lastBowl.isWicket.kind) {
-          const message = `Already a ${lastBowl.isWicket.kind} in this bowl. `
+        if (existingBowl.isWicket && existingBowl.isWicket.kind) {
+          const message = `Already a ${existingBowl.isWicket.kind} in this bowl. `
             + 'To input a bowl with only a run out or obstructing the field, '
             + 'input a bowl with 0 run first.';
           throw new Error(message);
@@ -562,7 +582,20 @@ router.post('/:id/bowl', [authenticateJwt(), bowlCreateValidation], async (reque
   }
 });
 
-async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo) {
+/**
+ * Updates a bowl and sends the response
+ * @param {Response} response
+ * @param match
+ * @param bowl
+ * @param {number|undefined} overNo
+ * @param {number|undefined} bowlNo
+ * @param {boolean} merge if merge is false, then the bowl is replaced by new payload
+ *              with an exception that `playedBy` can be kept if not passed in payload.
+ *              If merge is true, then all values of the bowl is kept if the value is not passed in payload.
+ * @returns {Promise<void>}
+ * @private
+ */
+async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo, merge = false) {
   const overExists = Number.isInteger(overNo);
   const bowlExists = Number.isInteger(bowlNo);
   if ((overExists || bowlExists) && !(overExists && bowlExists)) {
@@ -594,9 +627,14 @@ async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo) {
       msg: `There is no bowl at over ${overNo}, bowl ${bowlNo}`,
     }]);
   }
-  const field = `${match.state}.overs.${overNo}.bowls.${bowlNo}`;
 
-  const updateQuery = {$set: {[field]: {playedBy: prevBowl.playedBy, ...bowl}}};
+  const field = `${match.state}.overs.${overNo}.bowls.${bowlNo}`;
+  const updatedBowl = {
+    ...(merge && prevBowl),
+    ...(!merge && {playedBy: prevBowl.playedBy}),
+    ...bowl,
+  };
+  const updateQuery = {$set: {[field]: updatedBowl}};
 
   await Match.findByIdAndUpdate(match._id, updateQuery)
     .exec();
@@ -605,7 +643,7 @@ async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo) {
     innings: match.state,
     overIndex: overNo,
     bowlIndex: bowlNo,
-    bowl,
+    bowl: updatedBowl,
   });
 
   const amplitudeEvent = {
@@ -618,6 +656,10 @@ async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo) {
   await Logger.amplitude(Events.Match.Bowl.Create, response.req.user._id, amplitudeEvent);
 }
 
+/**
+ * Edits a bowl.
+ * May or may not pass `overNo` and `bowlNo`. If not passed, last bowl is updated.
+ */
 router.put('/:id/bowl', [authenticateJwt(), bowlEditValidation], async (request, response) => {
   try {
     const errors = validationResult(request);
@@ -643,8 +685,19 @@ router.put('/:id/bowl', [authenticateJwt(), bowlEditValidation], async (request,
   }
 });
 
-router.put('/:id/by', authenticateJwt(), async (request, response) => {
+/**
+ * Edits the last bowl such that is was a by.
+ * With *convenient* scoring UI, this API is not needed.
+ * With *pro* scoring UI, a bowl is created upon any action (run, boundary, wicket).
+ * Thus, to append a by run with that, a new API call is needed.
+ */
+router.put('/:id/by', [authenticateJwt(), byRunValidations], async (request, response) => {
   try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+
     const {
       run, boundary, overNo, bowlNo,
     } = nullEmptyValues(request);
@@ -653,7 +706,8 @@ router.put('/:id/by', authenticateJwt(), async (request, response) => {
       .findOne({
         _id: id,
         creator: request.user._id,
-      }, 'state innings1 innings2')
+      })
+      .select('state innings1 innings2')
       .lean()
       .exec();
     const bowl = !boundary ? {by: run} : {
@@ -662,20 +716,26 @@ router.put('/:id/by', authenticateJwt(), async (request, response) => {
         kind: 'by',
       },
     };
-    await _updateBowlAndSend(response, match, bowl, overNo, bowlNo);
+    await _updateBowlAndSend(response, match, bowl, overNo, bowlNo, true);
   } catch (err) {
     sendErrorResponse(response, err, 'Error while updating bowl', request.user);
   }
 });
 
-router.put('/:id/uncertain-out', [uncertainOutValidations, authenticateJwt()], async (request, response) => {
+/**
+ * Adds a uncertain-wicket (Run out, Obstructing the field) to the last bowl.
+ * With *convenient* scoring UI, this API is not needed.
+ * With *pro* scoring UI, a bowl is created upon any action (run, boundary).
+ * Thus, to append an uncertain wicket with that, a new API call is needed.
+ */
+router.put('/:id/uncertain-out', [authenticateJwt(), uncertainOutValidations], async (request, response) => {
   try {
-    const {id} = request.params;
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
       throw new Error400(errors.array());
     }
 
+    const {id} = request.params;
     const match = await Match
       .findOne({
         _id: id,
@@ -684,6 +744,7 @@ router.put('/:id/uncertain-out', [uncertainOutValidations, authenticateJwt()], a
       .lean()
       .exec();
 
+    // TODO: rename `batsman` param to `player`
     const {
       batsman, kind, overNo, bowlNo,
     } = nullEmptyValues(request);
@@ -693,7 +754,7 @@ router.put('/:id/uncertain-out', [uncertainOutValidations, authenticateJwt()], a
         player: batsman,
       },
     };
-    await _updateBowlAndSend(response, match, bowl, overNo, bowlNo);
+    await _updateBowlAndSend(response, match, bowl, overNo, bowlNo, true);
   } catch (err) {
     sendErrorResponse(response, err, 'Error while adding out', request.user);
   }
