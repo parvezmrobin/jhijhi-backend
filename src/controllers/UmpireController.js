@@ -1,120 +1,137 @@
+/**
+ * Parvez M Robin
+ * this@parvezmrobin.com
+ * Mar 28, 2020
+ */
+
+
 const express = require('express');
-const router = express.Router();
-const Umpire = require("../models/umpire");
-const responses = require("../responses");
 const passport = require('passport');
 const { check, validationResult } = require('express-validator/check');
 const ObjectId = require('mongoose/lib/types/objectid');
-const { namify, sendErrorResponse, send404Response } = require('../lib/utils');
+const responses = require('../responses');
+const Umpire = require('../models/umpire');
+const {Error404, Error400} = require('../lib/errors');
+const { namify, sendErrorResponse } = require('../lib/utils');
+
+const router = express.Router();
 
 /** @type {RequestHandler} */
 const authenticateJwt = passport.authenticate.bind(passport, 'jwt', {session: false});
 
 const nameExistsValidation = check('name')
   .trim()
-  .exists({ checkFalsy: true });
+  .exists();
 const umpireCreateValidations = [
   nameExistsValidation,
   check('name', 'Name already taken')
-    .custom((name, { req }) => Umpire
-      .findOne({
-        name: namify(name),
-        creator: req.user._id,
-      })
-      .exec()
-      .then(umpire => !umpire)),
+    .custom(async (name, {req}) => {
+      const umpire = await Umpire
+        .findOne({
+          name: namify(name),
+          creator: req.user._id,
+        })
+        .exec();
+      return !umpire;
+    }),
 ];
 
 const umpireEditValidations = [
   nameExistsValidation,
   check('name', 'Name already taken')
-    .custom((name, { req }) => Umpire
-      .findOne({
-        name: namify(name),
-        creator: req.user._id,
-      })
-      .lean()
-      .exec()
-      .then(player => !(player && player._id.toString() !== req.params.id))),
+    .custom(async (name, {req}) => {
+      const player = await Umpire
+        .findOne({
+          _id: {
+            $ne: req.params.id,
+          },
+          name: namify(name),
+          creator: req.user._id,
+        })
+        .lean()
+        .exec();
+      return !player;
+    }),
 ];
 
 
 /* GET umpires listing. */
-router.get('/', authenticateJwt(), (request, response) => {
-  let query = { creator: request.user._id };
-  if (request.query.search) {
-    query.name = new RegExp(request.query.search, 'i');
-  }
+router.get('/', authenticateJwt(), async (request, response) => {
+  try {
+    const query = {creator: request.user._id};
+    if (request.query.search) {
+      query.name = new RegExp(request.query.search, 'i');
+    }
 
-  Umpire
-    .find(query)
-    .lean()
-    .then(umpires => response.json(umpires))
-    .catch(err => sendErrorResponse(response, err, responses.teams.index.err, request.user));
+    const umpires = Umpire
+      .find(query)
+      .lean()
+      .exec();
+    response.json(umpires);
+  } catch (e) {
+    sendErrorResponse(response, e, responses.teams.index.err, request.user);
+  }
 });
 
 /* Create a new umpire */
-router.post('/', authenticateJwt(), umpireCreateValidations, (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const { name, jerseyNo } = request.body;
+router.post('/', authenticateJwt(), umpireCreateValidations, async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+    const {name} = request.body;
 
-  promise
-    .then(() => Umpire.create({
+    const createdUmpire = await Umpire.create({
       name: namify(name),
-      jerseyNo,
       creator: request.user._id,
-    }))
-    .then(createdUmpire => {
-      return response.json({
-        success: true,
-        message: responses.umpires.create.ok(name),
-        umpire: {
-          _id: createdUmpire._id,
-          name: createdUmpire.name,
-        },
-      });
-    })
-    .catch(err => sendErrorResponse(response, err, responses.umpires.create.err, request.user));
+    });
+
+    response.status(201).json({
+      success: true,
+      message: responses.umpires.create.ok(name),
+      umpire: {
+        _id: createdUmpire._id,
+        name: createdUmpire.name,
+      },
+    });
+  } catch (e) {
+    sendErrorResponse(response, e, responses.umpires.create.err, request.user);
+  }
 });
 
 /* Edit an existing umpire */
-router.put('/:id', authenticateJwt(), umpireEditValidations, (request, response) => {
-  const errors = validationResult(request);
-  const promise = errors.isEmpty() ? Promise.resolve() : Promise.reject({
-    status: 400,
-    errors: errors.array(),
-  });
-  const { name } = request.body;
+router.put('/:id', authenticateJwt(), umpireEditValidations, async (request, response) => {
+  try {
+    const errors = validationResult(request);
+    if (!errors.isEmpty()) {
+      throw new Error400(errors.array());
+    }
+    const {name} = request.body;
 
-  promise
-    .then(() => {
-      return Umpire
-        .findOneAndUpdate({
-          _id: ObjectId(request.params.id),
-          creator: request.user._id,
-        }, {
-          name: namify(name),
-          creator: request.user._id,
-        }, { new: true });
-    })
-    .then(updatedUmpire => {
-      if (!updatedUmpire) {
-        return send404Response(response, responses.umpires.get.err);
-      }
-      return response.json({
-        success: true,
-        message: responses.umpires.edit.ok(name),
-        umpire: {
-          _id: updatedUmpire._id,
-          name: updatedUmpire.name,
-        },
-      });
-    })
-    .catch(err => sendErrorResponse(response, err, responses.umpires.edit.err, request.user));
+    const updatedUmpire = await Umpire
+      .findOneAndUpdate({
+        _id: ObjectId(request.params.id),
+        creator: request.user._id,
+      }, {
+        name: namify(name),
+        creator: request.user._id,
+      }, {new: true});
+    if (!updatedUmpire) {
+      throw new Error404(responses.umpires.e404);
+    }
+
+    response.json({
+      success: true,
+      message: responses.umpires.edit.ok(name),
+      umpire: {
+        _id: updatedUmpire._id,
+        name: updatedUmpire.name,
+      },
+    });
+  } catch (e) {
+    sendErrorResponse(response, e, responses.umpires.edit.err, request.user);
+  }
 });
 
 module.exports = router;

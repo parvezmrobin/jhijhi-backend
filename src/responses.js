@@ -118,5 +118,6 @@ module.exports = {
       ok: (name) => `Successfully edited umpire ${name}`,
       err: 'Error while editing umpire',
     },
+    e404: 'Could not find an umpire with given id',
   },
 };
