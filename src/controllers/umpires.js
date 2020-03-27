@@ -1,10 +1,11 @@
 const express = require('express');
+
 const router = express.Router();
-const Umpire = require("../models/umpire");
-const responses = require("../responses");
 const passport = require('passport');
 const { check, validationResult } = require('express-validator/check');
 const ObjectId = require('mongoose/lib/types/objectid');
+const responses = require('../responses');
+const Umpire = require('../models/umpire');
 const { namify, sendErrorResponse, send404Response } = require('../lib/utils');
 
 /** @type {RequestHandler} */
@@ -22,7 +23,7 @@ const umpireCreateValidations = [
         creator: req.user._id,
       })
       .exec()
-      .then(umpire => !umpire)),
+      .then((umpire) => !umpire)),
 ];
 
 const umpireEditValidations = [
@@ -35,13 +36,13 @@ const umpireEditValidations = [
       })
       .lean()
       .exec()
-      .then(player => !(player && player._id.toString() !== req.params.id))),
+      .then((player) => !(player && player._id.toString() !== req.params.id))),
 ];
 
 
 /* GET umpires listing. */
 router.get('/', authenticateJwt(), (request, response) => {
-  let query = { creator: request.user._id };
+  const query = { creator: request.user._id };
   if (request.query.search) {
     query.name = new RegExp(request.query.search, 'i');
   }
@@ -49,8 +50,8 @@ router.get('/', authenticateJwt(), (request, response) => {
   Umpire
     .find(query)
     .lean()
-    .then(umpires => response.json(umpires))
-    .catch(err => sendErrorResponse(response, err, responses.teams.index.err, request.user));
+    .then((umpires) => response.json(umpires))
+    .catch((err) => sendErrorResponse(response, err, responses.teams.index.err, request.user));
 });
 
 /* Create a new umpire */
@@ -68,17 +69,15 @@ router.post('/', authenticateJwt(), umpireCreateValidations, (request, response)
       jerseyNo,
       creator: request.user._id,
     }))
-    .then(createdUmpire => {
-      return response.json({
-        success: true,
-        message: responses.umpires.create.ok(name),
-        umpire: {
-          _id: createdUmpire._id,
-          name: createdUmpire.name,
-        },
-      });
-    })
-    .catch(err => sendErrorResponse(response, err, responses.umpires.create.err, request.user));
+    .then((createdUmpire) => response.status(201).json({
+      success: true,
+      message: responses.umpires.create.ok(name),
+      umpire: {
+        _id: createdUmpire._id,
+        name: createdUmpire.name,
+      },
+    }))
+    .catch((err) => sendErrorResponse(response, err, responses.umpires.create.err, request.user));
 });
 
 /* Edit an existing umpire */
@@ -91,17 +90,15 @@ router.put('/:id', authenticateJwt(), umpireEditValidations, (request, response)
   const { name } = request.body;
 
   promise
-    .then(() => {
-      return Umpire
-        .findOneAndUpdate({
-          _id: ObjectId(request.params.id),
-          creator: request.user._id,
-        }, {
-          name: namify(name),
-          creator: request.user._id,
-        }, { new: true });
-    })
-    .then(updatedUmpire => {
+    .then(() => Umpire
+      .findOneAndUpdate({
+        _id: ObjectId(request.params.id),
+        creator: request.user._id,
+      }, {
+        name: namify(name),
+        creator: request.user._id,
+      }, { new: true }))
+    .then((updatedUmpire) => {
       if (!updatedUmpire) {
         return send404Response(response, responses.umpires.get.err);
       }
@@ -114,7 +111,7 @@ router.put('/:id', authenticateJwt(), umpireEditValidations, (request, response)
         },
       });
     })
-    .catch(err => sendErrorResponse(response, err, responses.umpires.edit.err, request.user));
+    .catch((err) => sendErrorResponse(response, err, responses.umpires.edit.err, request.user));
 });
 
 module.exports = router;
