@@ -23,6 +23,33 @@ app.use(cors());
 
 app.use((request, response, next) => {
   const ping = Date.now();
+
+  const backup = response.socket.write;
+  let code;
+  function newWriter(...args) {
+    for (const arg of args) {
+      if (typeof arg === 'string') {
+        if (arg.startsWith('HTTP')) {
+          const header = arg.substring(0, arg.indexOf('\n'));
+          [, code] = header.split(' ');
+          code = Number.parseInt(code, 10);
+        }
+      } else if (arg instanceof Buffer) {
+        const message = `Responding ${code} | ${arg}`;
+        if (code < 400) {
+          logger.info(message);
+        } else if (code < 500) {
+          logger.warn(message);
+        } else {
+          logger.error(message);
+        }
+      }
+    }
+
+    return backup.apply(this, args);
+  }
+  response.socket.write = newWriter;
+
   onFinished(response, (err) => {
     const pong = Date.now();
     const elapsed = (pong - ping) / 1000;
