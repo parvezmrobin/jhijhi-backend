@@ -132,9 +132,41 @@ async function tearDown() {
   await User.deleteMany({});
 }
 
+async function testBasicDataIntegrity(matchId, token, afterToss = false, state = 'toss') {
+  const res = await get(`/api/matches/${matchId}`, token);
+
+  res.should.have.status(200);
+  const match = res.body;
+  match.name.should.be.equals('Match 1');
+  match.overs.should.be.equal(4);
+  match.team1.should.include({name: 'Team0', shortName: 'T0'});
+  match.team2.should.include({name: 'Team1', shortName: 'T1'});
+  match.team1Captain.should.include({name: 'Player0', jerseyNo: 0});
+  match.team2Captain.should.include({name: 'Player3', jerseyNo: 3});
+  for (let i = 0; i < match.team1Players.length; i++) {
+    const team1Player = match.team1Players[i];
+    team1Player.should.include({name: `Player${i}`, jerseyNo: i});
+  }
+  for (let i = 0; i < match.team2Players.length; i++) {
+    const team2Player = match.team2Players[i];
+    team2Player.should.include({name: `Player${i + 3}`, jerseyNo: i + 3});
+  }
+  if (afterToss) {
+    match.team1WonToss.should.be.true;
+    match.team1BatFirst.should.be.false;
+  } else {
+    match.should.not.have.property('team1WonToss');
+    match.should.not.have.property('team1BatFirst');
+  }
+  match.state.should.be.equals(state);
+  match.tags.should.be.an('array').with.length(0);
+  return match;
+}
+
 module.exports.startUp = startUp;
 module.exports.tearDown = tearDown;
 module.exports.get = get;
 module.exports.post = post;
 module.exports.put = put;
 module.exports.destroy = destroy;
+module.exports.testBasicDataIntegrity = testBasicDataIntegrity;
