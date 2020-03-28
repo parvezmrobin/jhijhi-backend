@@ -15,7 +15,7 @@ const {namify} = require('../../lib/utils');
 
 chai.should();
 
-describe('Test Basic Match Functionality', function matchTestSuit() {
+describe('Test Basic Match Functionality', function matchBasicTestSuit() {
   this.timeout(10000);
 
   let token1;
