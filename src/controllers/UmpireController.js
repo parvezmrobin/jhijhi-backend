@@ -134,4 +134,26 @@ router.put('/:id', authenticateJwt(), umpireEditValidations, async (request, res
   }
 });
 
+router.delete('/:id', authenticateJwt(), async (req, res) => {
+  try {
+    const deletedUmpire = await Umpire
+      .findOneAndDelete({
+        _id: req.params.id,
+        creator: req.user._id,
+      })
+      .select({name: 1})
+      .lean()
+      .exec();
+    if (!deletedUmpire) {
+      throw new Error404(responses.umpires.e404);
+    }
+    res.json({
+      success: true,
+      message: responses.umpires.edit.ok(deletedUmpire.name),
+    });
+  } catch (e) {
+    sendErrorResponse(res, e, responses.umpires.delete.err, req.user);
+  }
+});
+
 module.exports = router;
