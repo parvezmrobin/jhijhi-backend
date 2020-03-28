@@ -90,6 +90,10 @@ module.exports = {
       ok: (name) => `Successfully edited match ${name}`,
       err: 'Error while editing match',
     },
+    delete: {
+      ok: (name) => `Successfully deleted match ${name}`,
+      err: 'Error while deleting match',
+    },
     begin: {
       ok: 'Successfully started match',
       err: 'Error while starting match',

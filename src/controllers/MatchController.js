@@ -5,7 +5,6 @@ const passport = require('passport');
 const {body, validationResult} = require('express-validator/check');
 const pick = require('lodash/pick');
 const isMongoId = require('validator/lib/isMongoId');
-const ObjectId = require('mongoose/lib/types/objectid');
 const Match = require('../models/match');
 const Team = require('../models/team');
 const Umpire = require('../models/umpire');
@@ -887,6 +886,9 @@ router.get('/:id', async (request, response) => {
       .findOne({_id: request.params.id})
       .populate('team1')
       .populate('team2')
+      .populate('umpire1')
+      .populate('umpire2')
+      .populate('umpire3')
       .populate('team1Captain')
       .populate('team2Captain')
       .populate('team1Players')
@@ -946,7 +948,7 @@ router.put('/:id', authenticateJwt(), matchEditValidations, async (request, resp
   try {
     const errors = validationResult(request);
     if (!errors.isEmpty()) {
-      throw new Error404(errors.array());
+      throw new Error400(errors.array());
     }
 
     const {
@@ -955,10 +957,10 @@ router.put('/:id', authenticateJwt(), matchEditValidations, async (request, resp
 
     const updatedMatch = await Match
       .findOneAndUpdate({
-        _id: ObjectId(request.params.id),
+        _id: request.params.id,
         creator: request.user._id,
       }, {
-        name,
+        name: namify(name),
         team1,
         team2,
         umpire1,
@@ -973,11 +975,30 @@ router.put('/:id', authenticateJwt(), matchEditValidations, async (request, resp
     }
     response.json({
       success: true,
-      message: responses.matches.edit.ok(name),
+      message: responses.matches.edit.ok(updatedMatch.name),
       match: pick(updatedMatch, ['_id', 'name', 'team1', 'team2', 'umpire1', 'umpire2', 'umpire3', 'overs', 'tags']),
     });
   } catch (err) {
     sendErrorResponse(response, err, responses.matches.edit.err, request.user);
+  }
+});
+
+router.delete('/:id', authenticateJwt(), async (req, res) => {
+  try {
+    const deletedMatch = await Match.findOneAndDelete({
+      _id: req.params.id,
+      creator: req.user._id,
+    })
+      .select('name');
+    if (!deletedMatch) {
+      throw new Error404(responses.matches.get.err);
+    }
+    res.json({
+      success: true,
+      message: responses.matches.delete.ok(deletedMatch.name),
+    });
+  } catch (e) {
+    sendErrorResponse(res, e, responses.matches.delete.err, req.user);
   }
 });
 
