@@ -1,5 +1,4 @@
 const express = require('express');
-const createError = require('http-errors');
 const cors = require('cors');
 const onFinished = require('on-finished');
 require('dotenv').config();
@@ -12,6 +11,7 @@ const PlayerRouter = require('./controllers/PlayerController');
 const TeamRouter = require('./controllers/TeamController');
 const MatchRouter = require('./controllers/MatchController');
 const UmpireRouter = require('./controllers/UmpireController');
+const {send404Response} = require('./lib/utils');
 
 const app = express();
 
@@ -89,8 +89,8 @@ app.use('/api/matches', MatchRouter);
 app.use('/api/umpires', UmpireRouter);
 
 // catch 404 and forward to error handler
-app.use((req, res, next) => {
-  next(createError(404));
+app.use((req, res) => {
+  send404Response(res);
 });
 
 // error handler

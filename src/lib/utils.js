@@ -48,7 +48,7 @@ function send404Response(response, message) {
     .json({
       success: false,
       message,
-      err: [message],
+      err: [{msg: message}],
     });
 }
 
