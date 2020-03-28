@@ -8,9 +8,10 @@ const {
   describe, before, it, after,
 } = require('mocha');
 const chai = require('chai');
+const {startUp} = require('./_matchHelpers');
 const {
-  startUp, tearDown, get, post, put, destroy,
-} = require('./_helpers');
+  get, post, put, destroy, tearDown,
+} = require('../_helpers');
 const {namify} = require('../../lib/utils');
 
 chai.should();

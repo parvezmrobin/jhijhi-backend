@@ -8,9 +8,8 @@ const {
   describe, before, it, after,
 } = require('mocha');
 const chai = require('chai');
-const {
-  startUp, tearDown, testBasicDataIntegrity, post, put,
-} = require('./_helpers');
+const {startUp, testBasicDataIntegrity} = require('./_matchHelpers');
+const {post, put, tearDown} = require('../_helpers');
 
 chai.should();
 
