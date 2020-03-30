@@ -10,7 +10,7 @@ chai.should();
 const {namify} = require('../lib/utils');
 
 describe('Test Team Functionality', function teamTestSuit() {
-  this.timeout(500000);
+  this.timeout(10000);
   let token1;
   let token2;
   let teamId;
