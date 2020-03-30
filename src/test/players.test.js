@@ -2,16 +2,14 @@ const {
   describe, before, it, after,
 } = require('mocha');
 const chai = require('chai');
-const chaiHttp = require('chai-http');
+const {
+  put, destroy, post, tearDown,
+} = require('./_helpers');
 
-chai.should();
-process.env.IS_TEST = true;
-const app = require('../app');
-const User = require('../models/user');
-const Player = require('../models/player');
 const {namify} = require('../lib/utils');
 
-chai.use(chaiHttp);
+chai.should();
+
 
 describe('Test Player Functionality', function playerTestSuit() {
   this.timeout(10000);
@@ -20,77 +18,52 @@ describe('Test Player Functionality', function playerTestSuit() {
   let playerId;
 
   before(async () => {
-    await chai.request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'username',
-        password: '1234',
-        confirm: '1234',
-      });
-    const res = await chai.request(app)
-      .post('/api/auth/login')
-      .send({
-        username: 'username',
-        password: '1234',
-      });
+    await post('/api/auth/register', {
+      username: 'username',
+      password: '1234',
+      confirm: '1234',
+    });
+    const res = await post('/api/auth/login', {
+      username: 'username',
+      password: '1234',
+    });
     token1 = res.body.token;
   });
 
   it('should not create a player without authentication', async () => {
-    const res = await chai.request(app)
-      .post('/api/players')
-      .send({
-        name: 'player',
-        jerseyNo: 1,
-      });
-
+    const res = await post('/api/players', {
+      name: 'player',
+      jerseyNo: 1,
+    });
     res.should.have.status(401);
   });
 
   it('should not create a player without values', async () => {
-    let res = await chai.request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${token1}`)
-      .send({});
-    res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('name')
-      .and.contain('jerseyNo');
+    const playerInfo = {
+      name: 'player',
+      jerseyNo: 1,
+    };
 
-    res = await chai.request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${token1}`)
-      .send({name: 'player'});
-    res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('jerseyNo')
-      .and.not.contain('name');
+    for (const key in playerInfo) {
+      const dumpedPlayerInfo = {...playerInfo, [key]: undefined};
+      const res = await post('/api/players', dumpedPlayerInfo, token1);
 
-    res = await chai.request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${token1}`)
-      .send({jerseyNo: 0});
-    res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('name')
-      .and.not.contain('jerseyNo');
+      res.should.have.status(400);
+      res.body.err.map((e) => e.param).should.contain(key);
+    }
 
     for (const jerseyNo of [-1, 1000]) {
-      res = await chai.request(app)
-        .post('/api/players')
-        .set('Authorization', `Bearer ${token1}`)
-        .send({jerseyNo});
+      const res = await post('/api/players', {jerseyNo}, token1);
       res.should.have.status(400);
       res.body.err.map((e) => e.param).should.contain('jerseyNo')
         .and.contain('name');
     }
   });
-
   async function testCreatePlayer(token) {
-    const res = await chai.request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'player',
-        jerseyNo: 1,
-      });
+    const res = await post('/api/players', {
+      name: 'player',
+      jerseyNo: 1,
+    }, token);
     res.should.have.status(201);
     const {player} = res.body;
     player.name.should.be.equals('Player'); // name is auto-capitalized
@@ -104,64 +77,47 @@ describe('Test Player Functionality', function playerTestSuit() {
   });
 
   it('should not create a duplicate player', async () => {
-    let res = await chai.request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${token1}`)
-      .send({
-        name: 'player',
-        jerseyNo: 2,
-      });
+    let res = await post('/api/players', {
+      name: 'player',
+      jerseyNo: 2,
+    }, token1);
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('name')
       .and.not.contain('jerseyNo');
 
-    res = await chai.request(app)
-      .post('/api/players')
-      .set('Authorization', `Bearer ${token1}`)
-      .send({
-        name: 'player2',
-        jerseyNo: 1,
-      });
+    res = await post('/api/players', {
+      name: 'player2',
+      jerseyNo: 1,
+    }, token1);
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('jerseyNo')
       .and.not.contain('name');
   });
-
   it('should create a player by different user', async () => {
-    await chai.request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'username2',
-        password: '1234',
-        confirm: '1234',
-      });
-    const loginRes = await chai.request(app)
-      .post('/api/auth/login')
-      .send({
-        username: 'username2',
-        password: '1234',
-      });
+    await post('/api/auth/register', {
+      username: 'username2',
+      password: '1234',
+      confirm: '1234',
+    });
+    const loginRes = await post('/api/auth/login', {
+      username: 'username2',
+      password: '1234',
+    });
     token2 = loginRes.body.token;
 
     await testCreatePlayer(token2);
   });
 
   it('should not edit a player of another user', async () => {
-    const res = await chai.request(app)
-      .put(`/api/players/${playerId}`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send({
-        name: 'player3',
-        jerseyNo: 3,
-      });
+    const res = await put(`/api/players/${playerId}`, {
+      name: 'player3',
+      jerseyNo: 3,
+    }, token2);
     res.should.have.status(404);
   });
 
   async function testEditPlayer(playerObject) {
-    const res = await chai.request(app)
-      .put(`/api/players/${playerId}`)
-      .set('Authorization', `Bearer ${token1}`)
-      .send(playerObject);
+    const res = await put(`/api/players/${playerId}`, playerObject, token1);
     res.should.have.status(200);
     const {player} = res.body;
     player.name.should.be.equals(namify(playerObject.name)); // name is auto-capitalized
@@ -184,31 +140,19 @@ describe('Test Player Functionality', function playerTestSuit() {
   });
 
   it('should not delete player of another user', async () => {
-    const res = await chai.request(app)
-      .delete(`/api/players/${playerId}`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send();
+    const res = await destroy(`/api/players/${playerId}`, token2);
     res.should.have.status(404);
   });
 
   it('should not delete with invalid mongo id', async () => {
-    const res = await chai.request(app)
-      .delete('/api/players/abc')
-      .set('Authorization', `Bearer ${token2}`)
-      .send();
+    const res = await destroy('/api/players/abc', token2);
     res.should.have.status(400);
   });
 
   it('should delete a player', async () => {
-    const res = await chai.request(app)
-      .delete(`/api/players/${playerId}`)
-      .set('Authorization', `Bearer ${token1}`)
-      .send();
+    const res = await destroy(`/api/players/${playerId}`, token1);
     res.should.have.status(200);
   });
 
-  after(async () => {
-    await Player.deleteMany({});
-    await User.deleteMany({});
-  });
+  after(tearDown);
 });
