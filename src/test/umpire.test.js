@@ -2,16 +2,12 @@ const {
   describe, before, it, after,
 } = require('mocha');
 const chai = require('chai');
-const chaiHttp = require('chai-http');
+const {
+  post, put, destroy, tearDown,
+} = require('./_helpers');
 
 chai.should();
-process.env.IS_TEST = true;
-const app = require('../app');
-const User = require('../models/user');
-const Umpire = require('../models/umpire');
 const {namify} = require('../lib/utils');
-
-chai.use(chaiHttp);
 
 describe('Test Umpire Functionality', function umpireTestSuit() {
   this.timeout(10000);
@@ -20,15 +16,12 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
   let umpireId;
 
   before(async () => {
-    await chai.request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'username',
-        password: '1234',
-        confirm: '1234',
-      });
-    const res = await chai.request(app)
-      .post('/api/auth/login')
+    await post('/api/auth/register', {
+      username: 'username',
+      password: '1234',
+      confirm: '1234',
+    });
+    const res = await post('/api/auth/login')
       .send({
         username: 'username',
         password: '1234',
@@ -37,31 +30,22 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
   });
 
   it('should not create an umpire without authentication', async () => {
-    const res = await chai.request(app)
-      .post('/api/umpires')
-      .send({
-        name: 'umpire',
-      });
-
+    const res = await post('/api/umpires', {
+      name: 'umpire',
+    });
     res.should.have.status(401);
   });
 
   it('should not create an umpire without values', async () => {
-    const res = await chai.request(app)
-      .post('/api/umpires')
-      .set('Authorization', `Bearer ${token1}`)
-      .send({});
+    const res = await post('/api/umpires', {}, token1);
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('name');
   });
 
   async function testCreateUmpire(token) {
-    const res = await chai.request(app)
-      .post('/api/umpires')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'umpire',
-      });
+    const res = await post('/api/umpires', {
+      name: 'umpire',
+    }, token);
     res.should.have.status(201);
     const {umpire} = res.body;
     umpire.name.should.be.equals('Umpire'); // name is auto-capitalized
@@ -74,50 +58,36 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
   });
 
   it('should not create a duplicate umpire', async () => {
-    const res = await chai.request(app)
-      .post('/api/umpires')
-      .set('Authorization', `Bearer ${token1}`)
-      .send({
-        name: 'umpire',
-      });
+    const res = await post('/api/umpires', {
+      name: 'umpire',
+    }, token1);
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('name');
   });
 
   it('should create an umpire by different user', async () => {
-    await chai.request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'username2',
-        password: '1234',
-        confirm: '1234',
-      });
-    const loginRes = await chai.request(app)
-      .post('/api/auth/login')
-      .send({
-        username: 'username2',
-        password: '1234',
-      });
+    await post('/api/auth/register', {
+      username: 'username2',
+      password: '1234',
+      confirm: '1234',
+    });
+    const loginRes = await post('/api/auth/login', {
+      username: 'username2',
+      password: '1234',
+    });
     token2 = loginRes.body.token;
-
     await testCreateUmpire(token2);
   });
 
   it('should not edit an umpire of another user', async () => {
-    const res = await chai.request(app)
-      .put(`/api/umpires/${umpireId}`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send({
-        name: 'umpire3',
-      });
+    const res = await put(`/api/umpires/${umpireId}`, {
+      name: 'umpire3',
+    }, token2);
     res.should.have.status(404);
   });
 
   async function testEditUmpire(umpireObject) {
-    const res = await chai.request(app)
-      .put(`/api/umpires/${umpireId}`)
-      .set('Authorization', `Bearer ${token1}`)
-      .send(umpireObject);
+    const res = await put(`/api/umpires/${umpireId}`, umpireObject, token1);
     res.should.have.status(200);
     const {umpire} = res.body;
     umpire.name.should.be.equals(namify(umpireObject.name)); // name is auto-capitalized
@@ -137,23 +107,14 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
   });
 
   it('should not delete umpire of another user', async () => {
-    const res = await chai.request(app)
-      .delete(`/api/umpires/${umpireId}`)
-      .set('Authorization', `Bearer ${token2}`)
-      .send();
+    const res = await destroy(`/api/umpires/${umpireId}`, token2);
     res.should.have.status(404);
   });
 
   it('should delete an umpire', async () => {
-    const res = await chai.request(app)
-      .delete(`/api/umpires/${umpireId}`)
-      .set('Authorization', `Bearer ${token1}`)
-      .send();
+    const res = await destroy(`/api/umpires/${umpireId}`, token1);
     res.should.have.status(200);
   });
 
-  after(async () => {
-    await Umpire.deleteMany({});
-    await User.deleteMany({});
-  });
+  after(tearDown);
 });
