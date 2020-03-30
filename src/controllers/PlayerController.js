@@ -96,12 +96,12 @@ function _getBattingInningsStats(battingInnings) {
   });
 }
 
-/**
- * @typedef {{isWicket: IsWicket}} Bowl
- * @typedef {{bowls: Array<Bowl>}} Over
- * @typedef {Array<Over>} Innings
- * @typedef {{ run, wicket, totalBowl }} BowlingStat
- */
+/** @typedef {{kind: string, player: number|undefined}} IsWicket */
+/** @typedef {{playedBy: number, isBoundary: {run: number, kind: string}, isWicket: IsWicket}} Bowl */
+/** @typedef {Bowl[]} Over */
+/** @typedef {Over[]} Innings */
+
+/** @typedef {{ run, wicket, totalBowl }} BowlingStat */
 
 /**
  * Get run, wicket and totalBowl of all inningses
@@ -232,6 +232,8 @@ router.get('/:id', [authenticateJwt(), playerGetValidations], async (request, re
     ]);
 
     // get the innings in which player with `playerId` has contributed (batted or bowled)
+    /** @typedef {{battingInnings, bowlingInnings, playerIndex}} Contribution */
+    /** @type {Contribution[]} */
     const matchesOfContribution = matchesOfPlayer.map((match) => {
       const team1Index = match.team1Players.map((_playerId) => _playerId.toString())
         .indexOf(playerId);
@@ -248,7 +250,8 @@ router.get('/:id', [authenticateJwt(), playerGetValidations], async (request, re
       const team2Index = match.team2Players.map((_playerId) => _playerId.toString())
         .indexOf(playerId);
       if (team2Index === -1) {
-        throw new Error('Error in player stat query');
+        throw new Error('Error in player stat query. '
+          + `Player ${player.name}(${player._id}) haven't played in match ${match.name}(${match._id}).`);
       }
       const [battingInnings, bowlingInnings] = match.team1BatFirst
         ? [match.innings2, match.innings1]
@@ -256,37 +259,42 @@ router.get('/:id', [authenticateJwt(), playerGetValidations], async (request, re
       return {
         battingInnings,
         bowlingInnings,
-        playerIndex: team1Index,
+        playerIndex: team2Index,
       };
     });
 
     // get the bowls of inningses he/she played
     let numOuts = 0;
-    const matchWiseBattedBowls = matchesOfContribution.map((match) => match.battingInnings.overs.reduce((bowls, over) => {
-      const onCreaseBowls = over.bowls.filter((bowl) => bowl.playedBy === match.playerIndex);
+    /** @type {Bowl[][]} */
+    const matchWiseBattedBowls = matchesOfContribution.map(
+      (match) => match.battingInnings.overs.reduce((bowls, over) => {
+        // iterating each over of his batting innings
+        const onCreaseBowls = over.bowls.filter((bowl) => bowl.playedBy === match.playerIndex);
 
-      /** @typedef {{kind: string, player: number}|undefined} IsWicket */
-
-      /** @type (IsWicket) => Boolean */
-      const outFilter = ({isWicket}) => isWicket && Number.isInteger(isWicket.player)
-          && (isWicket.player === match.playerIndex);
+        /** @type (Bowl) => Boolean */
+        const outFilter = ({playedBy, isWicket}) => {
+          if (!isWicket || !isWicket.kind) {
+            return false;
+          }
+          if (Number.isInteger(isWicket.player)) {
+            // it is an uncertain-wicket
+            return isWicket.player === match.playerIndex;
+          }
+          return playedBy === match.playerIndex;
+        };
         // `numOuts` needed to be calculated here
         // because a player can be out in a bowl he/she didn't played
-      const isOut = over.bowls.find(outFilter);
-      if (isOut) {
-        numOuts++;
-      } else { // check if it is a bowl where only on-crease batsman can get out
-        /** @type (IsWicket) => Boolean */
-        const onCreaseOutOnlyFilter = ({isWicket}) => isWicket && !Number.isInteger(isWicket.player);
-        if (onCreaseBowls.find(onCreaseOutOnlyFilter)) {
-          numOuts++;
-        }
-      }
+        const isOut = !!over.bowls.find(outFilter);
+        isOut && numOuts++;
 
-      bowls.push(...onCreaseBowls);
-      return bowls;
-    }, []));
-    const matchWiseBowledOvers = matches.map((match) => match.bowlingInnings.overs.filter((over) => over.bowledBy === match.playerIndex));
+        bowls.push(...onCreaseBowls);
+        return bowls;
+      }, []),
+    );
+
+    const matchWiseBowledOvers = matchesOfContribution.map(
+      (match) => match.bowlingInnings.overs.filter((over) => over.bowledBy === match.playerIndex),
+    );
 
     // calculate stat of each innings
     // filter battingInningses whether he/she played
