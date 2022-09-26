@@ -63,7 +63,7 @@ router.get('/', authenticateJwt(), async (request, response) => {
       query.name = new RegExp(request.query.search, 'i');
     }
 
-    const umpires = Umpire
+    const umpires = await Umpire
       .find(query)
       .lean()
       .exec();
