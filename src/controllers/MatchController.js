@@ -840,8 +840,12 @@ router.get('/', authenticateJwt(), async (request, response) => {
       const regExp = new RegExp(request.query.search, 'i');
       query.$or = [{name: regExp}, {tags: regExp}];
     }
-    const matches = await Match
-      .find(query)
+    const cursor = Match
+      .find(query);
+    if (request.query.compact) {
+      cursor.select({innings1: 0, innings2: 0});
+    }
+    const matches = await cursor
       .lean()
       .exec();
     matches.forEach((match) => {
