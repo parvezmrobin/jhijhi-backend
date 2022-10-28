@@ -51,7 +51,7 @@ const inningsSchema = new Schema({
       },
       isWide: Boolean,
       isNo: String, // containing the reason of no
-    }, {_id: false})],
+    })],
   }],
 }, {_id: false});
 

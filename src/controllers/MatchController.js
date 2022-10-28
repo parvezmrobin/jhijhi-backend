@@ -5,6 +5,7 @@ const passport = require('passport');
 const {body, validationResult} = require('express-validator/check');
 const pick = require('lodash/pick');
 const isMongoId = require('validator/lib/isMongoId');
+const {ObjectId} = require('mongoose/lib/types');
 const Match = require('../models/match');
 const Team = require('../models/team');
 const Umpire = require('../models/umpire');
@@ -540,6 +541,7 @@ router.post('/:id/bowl', [authenticateJwt(), bowlCreateValidation], async (reque
     }
 
     const bowl = nullEmptyValues(request);
+    bowl._id = new ObjectId();
     if (!['innings1', 'innings2'].includes(match.state)) {
       throw new Error400([{
         location: 'body',
@@ -566,7 +568,7 @@ router.post('/:id/bowl', [authenticateJwt(), bowlCreateValidation], async (reque
 
     await match.updateOne(updateQuery)
       .exec();
-    response.status(201).json({success: true});
+    response.status(201).json({success: true, _id: bowl._id});
 
     const innings = match[match.state];
     const amplitudeEvent = {
