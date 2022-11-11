@@ -603,22 +603,21 @@ async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo, merge =
     // provided either `overNo` or `bowlNo` but not both.
     throw new Error400([], 'Must provide either both `overNo` and `bowlNo` or none');
   }
-  let prevBowl; // if `overNo` and `bowlNo` is not provided, then update the last bowl
+
+  // if `overNo` and `bowlNo` is not provided, then update the last bowl
+  let overs;
   if (match.state === 'innings1') {
-    const {overs} = match.innings1;
-    overNo = overExists ? overNo : overs.length - 1; // eslint-disable-line no-param-reassign
-    const {bowls} = overs[overNo];
-    bowlNo = bowlExists ? bowlNo : bowls.length - 1; // eslint-disable-line no-param-reassign
-    prevBowl = bowls[bowlNo];
+    ({overs} = match.innings1);
   } else if (match.state === 'innings2') {
-    const {overs} = match.innings2;
-    overNo = overExists ? overNo : overs.length - 1; // eslint-disable-line no-param-reassign
-    const {bowls} = overs[overNo];
-    bowlNo = bowlExists ? bowlNo : bowls.length - 1; // eslint-disable-line no-param-reassign
-    prevBowl = bowls[bowlNo];
+    ({overs} = match.innings2);
   } else {
     throw new Error400([], 'State should be either innings 1 or innings 2');
   }
+  overNo = overExists ? overNo : overs.length - 1; // eslint-disable-line no-param-reassign
+  const {bowls} = overs[overNo];
+  bowlNo = bowlExists ? bowlNo : bowls.length - 1; // eslint-disable-line no-param-reassign
+  const prevBowl = bowls[bowlNo];
+
   if (!prevBowl) {
     throw new Error400([{
       location: 'body',
@@ -631,6 +630,7 @@ async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo, merge =
 
   const field = `${match.state}.overs.${overNo}.bowls.${bowlNo}`;
   const updatedBowl = {
+    _id: prevBowl._id,
     ...(merge && prevBowl),
     ...(!merge && {playedBy: prevBowl.playedBy}),
     ...bowl,
@@ -640,6 +640,7 @@ async function _updateBowlAndSend(response, match, bowl, overNo, bowlNo, merge =
   await Match.findByIdAndUpdate(match._id, updateQuery)
     .exec();
   response.json({
+    _id: prevBowl._id,
     success: true,
     innings: match.state,
     overIndex: overNo,
