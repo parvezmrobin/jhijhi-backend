@@ -18,7 +18,7 @@ jobs:
             - "1a:54:af:8a:e8:6e:9b:47:12:5c:47:96:c5:1b:f2:a5"
       - run:
           name: "Deploy Over SSH"
-          command: "ssh $SSH_USER@$SSH_HOST \"cd $PROJECT_ROOT && git pull && yarn pm2 reload jhijhi\""
+          command: "ssh $SSH_USER@$SSH_HOST \"cd $PROJECT_ROOT && git pull && nvm use 16 && yarn pm2 reload jhijhi\""
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
