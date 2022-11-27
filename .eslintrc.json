@@ -1,27 +1,34 @@
 {
-  "parser": "babel-eslint",
-  "extends": ["airbnb-base", "plugin:promise/recommended"],
+  "root": true,
+  "parser": "@babel/eslint-parser",
+  "parserOptions": {
+    "requireConfigFile": false,
+    "babelOptions": {
+      "babelrc": false,
+      "configFile": false,
+      // your babel options
+      "presets": ["@babel/preset-env"]
+    }
+  },
+  "plugins": ["prettier"],
+  "extends": ["airbnb-base", "plugin:promise/recommended", "prettier"],
   "env": {
-    "node": true
+    "node": true,
+    "mocha": true
   },
   "rules": {
+    "prettier/prettier": "error",
     "no-console": "warn",
-    "max-len": ["warn", 120],
-    "semi": "error",
-    "comma-dangle": ["error", "always-multiline"],
-    "no-plusplus": "off",
     "no-underscore-dangle": "off",
-    "no-restricted-syntax": "off",
-    "no-await-in-loop": "off",
+    "no-plusplus": "off",
     "no-continue": "off",
-    "object-curly-spacing": "off",
-    "no-prototype-builtins": "off",
-    "no-unused-expressions": "off",
+    "no-restricted-syntax": "off",
+    "no-labels": "off",
+    "react/require-default-props": "off",
+    "react/no-unused-class-component-methods": "off",
     "prefer-destructuring": ["error", {
       "array": false,
       "object": true
-    }],
-    "quotes": ["error", "single", { "avoidEscape": true }],
-    "guard-for-in": "off"
+    }]
   }
 }
