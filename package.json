@@ -18,12 +18,13 @@
   },
   "main": "src/bin/www",
   "engines": {
-    "node": "12.x",
+    "node": "16.x",
     "yarn": "1.x"
   },
   "scripts": {
     "start": "node src/bin/www",
     "dev": "nodemon src/bin/www",
+    "serve": "pm2 start src/bin/www --name jhijhi --log log.log --instances max",
     "test": "mocha --timeout 20000 src/test",
     "seed": "node src/console/seed.js",
     "del": "node src/console/del.js"
@@ -67,6 +68,7 @@
     "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.1",
     "eslint-plugin-promise": "^4.2.1",
-    "mocha": "^7.1.1"
+    "mocha": "^7.1.1",
+    "pm2": "^5.2.2"
   }
 }
