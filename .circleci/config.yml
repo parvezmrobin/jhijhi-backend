@@ -15,7 +15,7 @@ jobs:
     steps:
       - add_ssh_keys:
           fingerprints:
-            - "SHA256:prCZHTzghFgzB2jlTWD71ffP8PnheNUiT8lZ+XfL0MU"
+            - "1a:54:af:8a:e8:6e:9b:47:12:5c:47:96:c5:1b:f2:a5"
       - run:
           name: "Deploy Over SSH"
           command: "ssh $SSH_USER@$SSH_HOST \"cd $PROJECT_ROOT && git pull && yarn pm2 reload jhijhi\""
