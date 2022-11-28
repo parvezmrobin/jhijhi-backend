@@ -5,4 +5,5 @@ dist
 public
 *.log
 .env
+app.yaml
 _README.md
