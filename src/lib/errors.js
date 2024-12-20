@@ -4,6 +4,7 @@
  * Date: Apr 10, 2019
  */
 
+// eslint-disable-next-line max-classes-per-file
 class JhijhiError extends Error {
   constructor(code, name, message) {
     super();

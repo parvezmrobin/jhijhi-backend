@@ -1,13 +1,9 @@
-const {
-  describe, before, it, after,
-} = require('mocha');
+const { describe, before, it, after } = require('mocha');
 const chai = require('chai');
-const {
-  post, put, destroy, tearDown,
-} = require('./_helpers');
+const { post, put, destroy, tearDown } = require('./_helpers');
 
 chai.should();
-const {namify} = require('../lib/utils');
+const { namify } = require('../lib/utils');
 
 describe('Test Umpire Functionality', function umpireTestSuit() {
   this.timeout(10000);
@@ -21,11 +17,10 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
       password: '1234',
       confirm: '1234',
     });
-    const res = await post('/api/auth/login')
-      .send({
-        username: 'username',
-        password: '1234',
-      });
+    const res = await post('/api/auth/login').send({
+      username: 'username',
+      password: '1234',
+    });
     token1 = res.body.token;
   });
 
@@ -43,11 +38,15 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
   });
 
   async function testCreateUmpire(token) {
-    const res = await post('/api/umpires', {
-      name: 'umpire',
-    }, token);
+    const res = await post(
+      '/api/umpires',
+      {
+        name: 'umpire',
+      },
+      token
+    );
     res.should.have.status(201);
-    const {umpire} = res.body;
+    const { umpire } = res.body;
     umpire.name.should.be.equals('Umpire'); // name is auto-capitalized
     umpire.should.have.property('_id');
     return umpire._id;
@@ -58,9 +57,13 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
   });
 
   it('should not create a duplicate umpire', async () => {
-    const res = await post('/api/umpires', {
-      name: 'umpire',
-    }, token1);
+    const res = await post(
+      '/api/umpires',
+      {
+        name: 'umpire',
+      },
+      token1
+    );
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('name');
   });
@@ -80,16 +83,20 @@ describe('Test Umpire Functionality', function umpireTestSuit() {
   });
 
   it('should not edit an umpire of another user', async () => {
-    const res = await put(`/api/umpires/${umpireId}`, {
-      name: 'umpire3',
-    }, token2);
+    const res = await put(
+      `/api/umpires/${umpireId}`,
+      {
+        name: 'umpire3',
+      },
+      token2
+    );
     res.should.have.status(404);
   });
 
   async function testEditUmpire(umpireObject) {
     const res = await put(`/api/umpires/${umpireId}`, umpireObject, token1);
     res.should.have.status(200);
-    const {umpire} = res.body;
+    const { umpire } = res.body;
     umpire.name.should.be.equals(namify(umpireObject.name)); // name is auto-capitalized
     umpire.should.have.property('_id');
   }

@@ -1,6 +1,4 @@
-const {
-  describe, it, after,
-} = require('mocha');
+const { describe, it, after } = require('mocha');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 
@@ -16,13 +14,11 @@ describe('Test JWT authentication', function authenticationTestSuit() {
   let token;
 
   it('should make a new user', async () => {
-    const res = await chai.request(app)
-      .post('/api/auth/register')
-      .send({
-        username: 'username',
-        password: '1234',
-        confirm: '1234',
-      });
+    const res = await chai.request(app).post('/api/auth/register').send({
+      username: 'username',
+      password: '1234',
+      confirm: '1234',
+    });
     res.should.have.status(200);
     res.body.should.be.an('object');
     res.body.user.should.be.an('object');
@@ -30,20 +26,19 @@ describe('Test JWT authentication', function authenticationTestSuit() {
   });
 
   it('should login with the new user', async () => {
-    const res = await chai.request(app)
-      .post('/api/auth/login')
-      .send({
-        username: 'username',
-        password: '1234',
-      });
+    const res = await chai.request(app).post('/api/auth/login').send({
+      username: 'username',
+      password: '1234',
+    });
     res.should.have.status(200);
     res.body.success.should.be.equals(true);
     res.body.token.should.be.a('string');
-    ({token} = res.body);
+    ({ token } = res.body);
   });
 
   it('should authenticate using token', async () => {
-    const res = await chai.request(app)
+    const res = await chai
+      .request(app)
       .get('/api/auth/user')
       .set('Authorization', `Bearer ${token}`);
     res.should.have.status(200);

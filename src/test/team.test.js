@@ -1,13 +1,9 @@
-const {
-  describe, before, it, after,
-} = require('mocha');
+const { describe, before, it, after } = require('mocha');
 const chai = require('chai');
-const {
-  put, post, destroy, tearDown,
-} = require('./_helpers');
+const { put, post, destroy, tearDown } = require('./_helpers');
 
 chai.should();
-const {namify} = require('../lib/utils');
+const { namify } = require('../lib/utils');
 
 describe('Test Team Functionality', function teamTestSuit() {
   this.timeout(10000);
@@ -21,11 +17,15 @@ describe('Test Team Functionality', function teamTestSuit() {
   let presetId;
 
   async function createPlayer(token, playerName, playerJerseyNo) {
-    const res = await post('/api/players', {
-      name: playerName,
-      jerseyNo: playerJerseyNo,
-    }, token);
-    const {player} = res.body;
+    const res = await post(
+      '/api/players',
+      {
+        name: playerName,
+        jerseyNo: playerJerseyNo,
+      },
+      token
+    );
+    const { player } = res.body;
     return player._id;
   }
   before(async () => {
@@ -61,28 +61,38 @@ describe('Test Team Functionality', function teamTestSuit() {
     };
 
     for (const key in teamInfo) {
-      const dumpedTeamInfo = {...teamInfo, [key]: undefined};
+      const dumpedTeamInfo = { ...teamInfo, [key]: undefined };
       const res = await post('/api/teams', dumpedTeamInfo, token1);
       res.should.have.status(400);
       res.body.err.map((e) => e.param).should.contain(key);
     }
 
-    const res = await post('/api/teams', {
-      name: 'team',
-      shortName: 't',
-    }, token1);
+    const res = await post(
+      '/api/teams',
+      {
+        name: 'team',
+        shortName: 't',
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('shortName')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('shortName')
       .and.not.contain('name');
   });
 
   async function testCreateTeam(token) {
-    const res = await post('/api/teams', {
-      name: 'team',
-      shortName: 'tea',
-    }, token);
+    const res = await post(
+      '/api/teams',
+      {
+        name: 'team',
+        shortName: 'tea',
+      },
+      token
+    );
     res.should.have.status(201);
-    const {team} = res.body;
+    const { team } = res.body;
     team.name.should.be.equals('Team'); // name is auto-capitalized
     team.shortName.should.be.equals('TEA'); // short name is auto-capitalized
     team.should.have.property('_id');
@@ -94,20 +104,32 @@ describe('Test Team Functionality', function teamTestSuit() {
   });
 
   it('should not create a duplicate team', async () => {
-    let res = await post('/api/teams', {
-      name: 'team',
-      shortName: 'te',
-    }, token1);
+    let res = await post(
+      '/api/teams',
+      {
+        name: 'team',
+        shortName: 'te',
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('name')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('name')
       .and.not.contain('shortName');
 
-    res = await post('/api/teams', {
-      name: 'team2',
-      shortName: 'tea',
-    }, token1);
+    res = await post(
+      '/api/teams',
+      {
+        name: 'team2',
+        shortName: 'tea',
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('shortName')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('shortName')
       .and.not.contain('name');
   });
 
@@ -127,17 +149,21 @@ describe('Test Team Functionality', function teamTestSuit() {
   });
 
   it('should not edit a team of another user', async () => {
-    const res = await put(`/api/teams/${teamId}`, {
-      name: 'team3',
-      shortName: 'tea3',
-    }, token2);
+    const res = await put(
+      `/api/teams/${teamId}`,
+      {
+        name: 'team3',
+        shortName: 'tea3',
+      },
+      token2
+    );
     res.should.have.status(404);
   });
 
   async function testEditTeam(teamObject) {
     const res = await put(`/api/teams/${teamId}`, teamObject, token1);
     res.should.have.status(200);
-    const {team} = res.body;
+    const { team } = res.body;
     team.name.should.be.equals(namify(teamObject.name)); // name is auto-capitalized
     team.shortName.should.be.equals(teamObject.shortName.toUpperCase());
     team.should.have.property('_id');
@@ -160,31 +186,49 @@ describe('Test Team Functionality', function teamTestSuit() {
   it('should not create a preset without name', async () => {
     const res = await post(`/api/teams/${teamId}/presets`, {}, token1);
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('name')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('name')
       .and.contain('players');
   });
 
   it('should not create a preset without min 2 players', async () => {
-    let res = await post(`/api/teams/${teamId}/presets`, {name: 'team'}, token1);
+    let res = await post(
+      `/api/teams/${teamId}/presets`,
+      { name: 'team' },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('players')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('players')
       .and.not.contain('name');
 
-    res = await post(`/api/teams/${teamId}/presets`, {
-      name: 'team',
-      players: [player1],
-    }, token1);
+    res = await post(
+      `/api/teams/${teamId}/presets`,
+      {
+        name: 'team',
+        players: [player1],
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('players')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('players')
       .and.not.contain('name');
   });
   async function testCreatePreset(token) {
-    const res = await post(`/api/teams/${teamId}/presets`, {
-      name: 'team',
-      players: [player1, player2],
-    }, token);
+    const res = await post(
+      `/api/teams/${teamId}/presets`,
+      {
+        name: 'team',
+        players: [player1, player2],
+      },
+      token
+    );
     res.should.have.status(201);
-    const {preset} = res.body;
+    const { preset } = res.body;
     preset.name.should.be.equals('Team'); // name is auto-capitalized
     preset.players[0].should.be.equals(player1); // short name is auto-capitalized
     preset.players[1].should.be.equals(player2);
@@ -196,45 +240,71 @@ describe('Test Team Functionality', function teamTestSuit() {
   });
 
   it('should not create a preset of another user', async () => {
-    const res = await post(`/api/teams/${teamId}/presets`, {
-      name: 'team',
-      players: [player1, player2],
-    }, token2);
+    const res = await post(
+      `/api/teams/${teamId}/presets`,
+      {
+        name: 'team',
+        players: [player1, player2],
+      },
+      token2
+    );
     res.should.have.status(404);
   });
 
   it('should not insert players of another user into a preset', async () => {
-    const res = await post(`/api/teams/${teamId}/presets`, {
-      name: 'team',
-      players: [player3, player4],
-    }, token1);
+    const res = await post(
+      `/api/teams/${teamId}/presets`,
+      {
+        name: 'team',
+        players: [player3, player4],
+      },
+      token1
+    );
     res.should.have.status(400);
   });
 
   it('should not create a duplicate preset', async () => {
-    const res = await post(`/api/teams/${teamId}/presets`, {
-      name: 'team',
-      players: [player1, player2],
-    }, token1);
+    const res = await post(
+      `/api/teams/${teamId}/presets`,
+      {
+        name: 'team',
+        players: [player1, player2],
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('name')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('name')
       .and.not.contain('players');
   });
   it('should not insert same player into a preset', async () => {
-    const res = await post(`/api/teams/${teamId}/presets`, {
-      name: 'team1',
-      players: [player1, player1],
-    }, token1);
+    const res = await post(
+      `/api/teams/${teamId}/presets`,
+      {
+        name: 'team1',
+        players: [player1, player1],
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('players')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('players')
       .and.not.contain('name');
   });
   it('should not delete preset of another user', async () => {
-    const res = await destroy(`/api/teams/${teamId}/presets/${presetId}`, token2);
+    const res = await destroy(
+      `/api/teams/${teamId}/presets/${presetId}`,
+      token2
+    );
     res.should.have.status(404);
   });
   it('should delete a preset', async () => {
-    const res = await destroy(`/api/teams/${teamId}/presets/${presetId}`, token1);
+    const res = await destroy(
+      `/api/teams/${teamId}/presets/${presetId}`,
+      token1
+    );
     res.should.have.status(200);
   });
   after(tearDown);

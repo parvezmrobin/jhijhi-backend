@@ -4,15 +4,11 @@
  * Mar 28, 2020
  */
 
-const {
-  describe, before, it, after,
-} = require('mocha');
+const { describe, before, it, after } = require('mocha');
 const chai = require('chai');
-const {startUp} = require('./_matchHelpers');
-const {
-  get, post, put, destroy, tearDown,
-} = require('../_helpers');
-const {namify} = require('../../lib/utils');
+const { startUp } = require('./_matchHelpers');
+const { get, post, put, destroy, tearDown } = require('../_helpers');
+const { namify } = require('../../lib/utils');
 
 chai.should();
 
@@ -28,9 +24,8 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
   let matchId1;
 
   before(async () => {
-    ({
-      token1, token2, umpireIds1, umpireIds2, teamIds1, teamIds2,
-    } = await startUp());
+    ({ token1, token2, umpireIds1, umpireIds2, teamIds1, teamIds2 } =
+      await startUp());
   });
 
   it('should not create a match without authentication', async () => {
@@ -53,7 +48,7 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
     };
 
     for (const key in matchInfo) {
-      const dumpedMatchInfo = {...matchInfo, [key]: undefined};
+      const dumpedMatchInfo = { ...matchInfo, [key]: undefined };
       const res = await post('/api/matches', dumpedMatchInfo, token1);
 
       res.should.have.status(400);
@@ -62,12 +57,16 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
   });
 
   it('should not create match with duplicate team', async () => {
-    const res = await post('/api/matches', {
-      name: 'match 1',
-      team1: teamIds1[0],
-      team2: teamIds1[0],
-      overs: 4,
-    }, token1);
+    const res = await post(
+      '/api/matches',
+      {
+        name: 'match 1',
+        team1: teamIds1[0],
+        team2: teamIds1[0],
+        overs: 4,
+      },
+      token1
+    );
 
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('team1');
@@ -85,11 +84,16 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
     };
     for (let i = 0; i < 3; i++) {
       const j = (i + 1) % 3;
-      const dumpedMatchInfo = {...matchInfo, [`umpire${j + 1}`]: matchInfo[`umpire${i + 1}`]};
+      const dumpedMatchInfo = {
+        ...matchInfo,
+        [`umpire${j + 1}`]: matchInfo[`umpire${i + 1}`],
+      };
       const res = await post('/api/matches', dumpedMatchInfo, token1);
 
       res.should.have.status(400);
-      res.body.err.map((e) => e.param).should.contain(`umpire${i + 1}`)
+      res.body.err
+        .map((e) => e.param)
+        .should.contain(`umpire${i + 1}`)
         .and.contain(`umpire${j + 1}`);
     }
   });
@@ -97,7 +101,7 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
   async function testCreateMatch(token, matchData) {
     const res = await post('/api/matches', matchData, token);
     res.should.have.status(201);
-    const {match} = res.body;
+    const { match } = res.body;
     for (const key in matchData) {
       if (key === 'name') {
         match.name.should.be.equals(namify(matchData.name));
@@ -149,12 +153,16 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
   });
 
   it('should not create match with same name', async () => {
-    const res = await post('/api/matches', {
-      name: 'match 1',
-      team1: teamIds1[0],
-      team2: teamIds1[1],
-      overs: 4,
-    }, token1);
+    const res = await post(
+      '/api/matches',
+      {
+        name: 'match 1',
+        team1: teamIds1[0],
+        team2: teamIds1[1],
+        overs: 4,
+      },
+      token1
+    );
 
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('name');
@@ -170,31 +178,43 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
   });
 
   it('should not create match with teams of other user', async () => {
-    const res = await post('/api/matches', {
-      name: 'match 2',
-      team1: teamIds1[0],
-      team2: teamIds1[1],
-      overs: 4,
-    }, token2);
+    const res = await post(
+      '/api/matches',
+      {
+        name: 'match 2',
+        team1: teamIds1[0],
+        team2: teamIds1[1],
+        overs: 4,
+      },
+      token2
+    );
 
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('team1')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('team1')
       .and.contain('team2');
   });
 
   it('should not create match with umpires of other user', async () => {
-    const res = await post('/api/matches', {
-      name: 'match 2',
-      team1: teamIds2[0],
-      team2: teamIds2[1],
-      umpire1: umpireIds1[0],
-      umpire2: umpireIds1[1],
-      umpire3: umpireIds1[2],
-      overs: 4,
-    }, token2);
+    const res = await post(
+      '/api/matches',
+      {
+        name: 'match 2',
+        team1: teamIds2[0],
+        team2: teamIds2[1],
+        umpire1: umpireIds1[0],
+        umpire2: umpireIds1[1],
+        umpire3: umpireIds1[2],
+        overs: 4,
+      },
+      token2
+    );
 
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.have.members(['umpire1', 'umpire2', 'umpire3']);
+    res.body.err
+      .map((e) => e.param)
+      .should.have.members(['umpire1', 'umpire2', 'umpire3']);
   });
 
   it('should not get match list without authorization', async () => {
@@ -229,58 +249,76 @@ describe('Test Basic Match Functionality', function matchBasicTestSuit() {
   });
 
   it('should not update a match without authentication', async () => {
-    const res = await put(`/api/matches/${matchId1}`, {name: 'match 3'});
+    const res = await put(`/api/matches/${matchId1}`, { name: 'match 3' });
     res.should.have.status(401);
   });
 
   it('should not update a match of other user', async () => {
-    const res = await put(`/api/matches/${matchId1}`, {
-      name: 'match 4',
-      team1: teamIds2[0],
-      team2: teamIds2[1],
-      overs: 4,
-    }, token2);
+    const res = await put(
+      `/api/matches/${matchId1}`,
+      {
+        name: 'match 4',
+        team1: teamIds2[0],
+        team2: teamIds2[1],
+        overs: 4,
+      },
+      token2
+    );
     res.should.have.status(404);
   });
 
   it('should not update match with teams of other user', async () => {
-    const res = await put(`/api/matches/${matchId1}`, {
-      name: 'match 4',
-      team1: teamIds2[0],
-      team2: teamIds2[1],
-      overs: 4,
-    }, token1);
+    const res = await put(
+      `/api/matches/${matchId1}`,
+      {
+        name: 'match 4',
+        team1: teamIds2[0],
+        team2: teamIds2[1],
+        overs: 4,
+      },
+      token1
+    );
 
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.have.members(['team1', 'team2']);
   });
 
   it('should not update match with umpires of other user', async () => {
-    const res = await put(`/api/matches/${matchId1}`, {
-      name: 'match 4',
-      team1: teamIds1[0],
-      team2: teamIds1[1],
-      umpire1: umpireIds2[0],
-      umpire2: umpireIds2[2],
-      umpire3: umpireIds2[1],
-      overs: 4,
-    }, token1);
+    const res = await put(
+      `/api/matches/${matchId1}`,
+      {
+        name: 'match 4',
+        team1: teamIds1[0],
+        team2: teamIds1[1],
+        umpire1: umpireIds2[0],
+        umpire2: umpireIds2[2],
+        umpire3: umpireIds2[1],
+        overs: 4,
+      },
+      token1
+    );
 
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.have.members(['umpire1', 'umpire2', 'umpire3']);
+    res.body.err
+      .map((e) => e.param)
+      .should.have.members(['umpire1', 'umpire2', 'umpire3']);
   });
 
   it('should successfully update the match', async () => {
-    const res = await put(`/api/matches/${matchId1}`, {
-      name: 'match 4',
-      team1: teamIds1[1],
-      team2: teamIds1[2],
-      umpire1: umpireIds1[1],
-      umpire2: umpireIds1[2],
-      umpire3: umpireIds1[0],
-      overs: 40,
-      tags: ['hij', 'klm'],
-    }, token1);
+    const res = await put(
+      `/api/matches/${matchId1}`,
+      {
+        name: 'match 4',
+        team1: teamIds1[1],
+        team2: teamIds1[2],
+        umpire1: umpireIds1[1],
+        umpire2: umpireIds1[2],
+        umpire3: umpireIds1[0],
+        overs: 40,
+        tags: ['hij', 'klm'],
+      },
+      token1
+    );
 
     res.should.have.status(200);
   });

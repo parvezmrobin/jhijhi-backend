@@ -4,7 +4,6 @@
  * Date: May 23, 2019
  */
 
-
 const mongoose = require('mongoose');
 const User = require('../models/user');
 const Player = require('../models/player');
@@ -23,7 +22,7 @@ require('dotenv').config();
       useNewUrlParser: true,
       useFindAndModify: false,
     });
-    console.log('Connected to database: \'jhijhi\'');
+    console.log("Connected to database: 'jhijhi'");
     const user = await User.findOneAndDelete({ username });
     if (!user) {
       throw new Error('Invalid username provided');

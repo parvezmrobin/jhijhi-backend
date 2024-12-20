@@ -4,7 +4,6 @@
  * Date: Jun 05, 2019
  */
 
-
 module.exports = {
   timestamps: {
     createdAt: 'created_at',

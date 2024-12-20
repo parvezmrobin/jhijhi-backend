@@ -30,5 +30,14 @@
       "array": false,
       "object": true
     }]
-  }
+  },
+  "overrides": [{
+    "files": "src/test/**/*.js",
+    "rules": {
+      "guard-for-in": "off",
+      "no-await-in-loop": "off",
+      "no-unused-expressions": "off",
+      "import/no-extraneous-dependencies": "off"
+    }
+  }]
 }

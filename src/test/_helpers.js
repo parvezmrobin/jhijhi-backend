@@ -50,10 +50,14 @@ function destroy(url, token, payload) {
 async function createPlayers(token, count = 6) {
   const playerCreatePromises = [];
   for (let i = 0; i < count; i++) {
-    const playerCreatePromise = post('/api/players', {
-      name: `player${i}`,
-      jerseyNo: i,
-    }, token);
+    const playerCreatePromise = post(
+      '/api/players',
+      {
+        name: `player${i}`,
+        jerseyNo: i,
+      },
+      token
+    );
     playerCreatePromises.push(playerCreatePromise);
   }
 
@@ -65,7 +69,11 @@ async function createPlayers(token, count = 6) {
 async function createUmpires(token, count = 3) {
   const umpireCreatePromises = [];
   for (let i = 0; i < count; i++) {
-    const playerCreatePromise = post('/api/umpires', {name: `umpire${i}`}, token);
+    const playerCreatePromise = post(
+      '/api/umpires',
+      { name: `umpire${i}` },
+      token
+    );
     umpireCreatePromises.push(playerCreatePromise);
   }
 
@@ -76,10 +84,14 @@ async function createUmpires(token, count = 3) {
 async function createTeams(token, count = 3) {
   const teamCreatePromises1 = [];
   for (let i = 0; i < count; i++) {
-    const teamCreatePromise = post('/api/teams', {
-      name: `team${i}`,
-      shortName: `t${i}`,
-    }, token);
+    const teamCreatePromise = post(
+      '/api/teams',
+      {
+        name: `team${i}`,
+        shortName: `t${i}`,
+      },
+      token
+    );
     teamCreatePromises1.push(teamCreatePromise);
   }
 

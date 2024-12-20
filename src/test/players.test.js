@@ -1,15 +1,10 @@
-const {
-  describe, before, it, after,
-} = require('mocha');
+const { describe, before, it, after } = require('mocha');
 const chai = require('chai');
-const {
-  put, destroy, post, tearDown,
-} = require('./_helpers');
+const { put, destroy, post, tearDown } = require('./_helpers');
 
-const {namify} = require('../lib/utils');
+const { namify } = require('../lib/utils');
 
 chai.should();
-
 
 describe('Test Player Functionality', function playerTestSuit() {
   this.timeout(10000);
@@ -45,7 +40,7 @@ describe('Test Player Functionality', function playerTestSuit() {
     };
 
     for (const key in playerInfo) {
-      const dumpedPlayerInfo = {...playerInfo, [key]: undefined};
+      const dumpedPlayerInfo = { ...playerInfo, [key]: undefined };
       const res = await post('/api/players', dumpedPlayerInfo, token1);
 
       res.should.have.status(400);
@@ -53,19 +48,25 @@ describe('Test Player Functionality', function playerTestSuit() {
     }
 
     for (const jerseyNo of [-1, 1000]) {
-      const res = await post('/api/players', {jerseyNo}, token1);
+      const res = await post('/api/players', { jerseyNo }, token1);
       res.should.have.status(400);
-      res.body.err.map((e) => e.param).should.contain('jerseyNo')
+      res.body.err
+        .map((e) => e.param)
+        .should.contain('jerseyNo')
         .and.contain('name');
     }
   });
   async function testCreatePlayer(token) {
-    const res = await post('/api/players', {
-      name: 'player',
-      jerseyNo: 1,
-    }, token);
+    const res = await post(
+      '/api/players',
+      {
+        name: 'player',
+        jerseyNo: 1,
+      },
+      token
+    );
     res.should.have.status(201);
-    const {player} = res.body;
+    const { player } = res.body;
     player.name.should.be.equals('Player'); // name is auto-capitalized
     player.jerseyNo.should.be.equals(1);
     player.should.have.property('_id');
@@ -77,20 +78,32 @@ describe('Test Player Functionality', function playerTestSuit() {
   });
 
   it('should not create a duplicate player', async () => {
-    let res = await post('/api/players', {
-      name: 'player',
-      jerseyNo: 2,
-    }, token1);
+    let res = await post(
+      '/api/players',
+      {
+        name: 'player',
+        jerseyNo: 2,
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('name')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('name')
       .and.not.contain('jerseyNo');
 
-    res = await post('/api/players', {
-      name: 'player2',
-      jerseyNo: 1,
-    }, token1);
+    res = await post(
+      '/api/players',
+      {
+        name: 'player2',
+        jerseyNo: 1,
+      },
+      token1
+    );
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.contain('jerseyNo')
+    res.body.err
+      .map((e) => e.param)
+      .should.contain('jerseyNo')
       .and.not.contain('name');
   });
   it('should create a player by different user', async () => {
@@ -109,17 +122,21 @@ describe('Test Player Functionality', function playerTestSuit() {
   });
 
   it('should not edit a player of another user', async () => {
-    const res = await put(`/api/players/${playerId}`, {
-      name: 'player3',
-      jerseyNo: 3,
-    }, token2);
+    const res = await put(
+      `/api/players/${playerId}`,
+      {
+        name: 'player3',
+        jerseyNo: 3,
+      },
+      token2
+    );
     res.should.have.status(404);
   });
 
   async function testEditPlayer(playerObject) {
     const res = await put(`/api/players/${playerId}`, playerObject, token1);
     res.should.have.status(200);
-    const {player} = res.body;
+    const { player } = res.body;
     player.name.should.be.equals(namify(playerObject.name)); // name is auto-capitalized
     player.jerseyNo.should.be.equals(playerObject.jerseyNo);
     player.should.have.property('_id');

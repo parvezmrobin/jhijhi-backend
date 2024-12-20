@@ -4,12 +4,10 @@
  * Mar 29, 2020
  */
 
-const {
-  describe, before, it, after,
-} = require('mocha');
+const { describe, before, it, after } = require('mocha');
 const chai = require('chai');
-const {startUp, testBasicDataIntegrity} = require('./_matchHelpers');
-const {post, put, tearDown} = require('../_helpers');
+const { startUp, testBasicDataIntegrity } = require('./_matchHelpers');
+const { post, put, tearDown } = require('../_helpers');
 
 chai.should();
 
@@ -25,34 +23,50 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
 
   before(async () => {
     ({
-      token1, token2, playerIds1: playerIds, teamIds1: teamIds, umpireIds1: umpireIds,
+      token1,
+      token2,
+      playerIds1: playerIds,
+      teamIds1: teamIds,
+      umpireIds1: umpireIds,
     } = await startUp());
 
     // create match1
-    const res = await post('/api/matches/', {
-      name: 'match 1',
-      team1: teamIds[0],
-      team2: teamIds[1],
-      umpire1: umpireIds[0],
-      umpire2: umpireIds[1],
-      umpire3: umpireIds[2],
-      overs: 4,
-    }, token1);
+    const res = await post(
+      '/api/matches/',
+      {
+        name: 'match 1',
+        team1: teamIds[0],
+        team2: teamIds[1],
+        umpire1: umpireIds[0],
+        umpire2: umpireIds[1],
+        umpire3: umpireIds[2],
+        overs: 4,
+      },
+      token1
+    );
     matchId = res.body.match._id;
 
     // start match
-    await put(`/api/matches/${matchId}/begin`, {
-      team1Captain: playerIds[0],
-      team2Captain: playerIds[3],
-      team1Players: playerIds.slice(0, 3),
-      team2Players: playerIds.slice(3),
-    }, token1);
+    await put(
+      `/api/matches/${matchId}/begin`,
+      {
+        team1Captain: playerIds[0],
+        team2Captain: playerIds[3],
+        team1Players: playerIds.slice(0, 3),
+        team2Players: playerIds.slice(3),
+      },
+      token1
+    );
 
     // toss match
-    await put(`/api/matches/${matchId}/toss`, {
-      won: teamIds[0],
-      choice: 'Bowl',
-    }, token1);
+    await put(
+      `/api/matches/${matchId}/toss`,
+      {
+        won: teamIds[0],
+        choice: 'Bowl',
+      },
+      token1
+    );
 
     // match is not state innings1
   });
@@ -76,20 +90,32 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
 
   it('should not add an over without `bowledBy`', async () => {
     for (const bowledBy of [null, -1, 'spd']) {
-      const res = await post(`/api/matches/${matchId}/over`, {bowledBy}, token1);
+      const res = await post(
+        `/api/matches/${matchId}/over`,
+        { bowledBy },
+        token1
+      );
       res.should.have.status(400);
       res.body.err[0].param.should.be.equals('bowledBy');
     }
   });
 
   it('should not add an over to match of other user', async () => {
-    const res = await post(`/api/matches/${matchId}/over`, {bowledBy: 0}, token2);
+    const res = await post(
+      `/api/matches/${matchId}/over`,
+      { bowledBy: 0 },
+      token2
+    );
 
     res.should.have.status(404);
   });
 
   async function testAddNewOver() {
-    const res = await post(`/api/matches/${matchId}/over`, {bowledBy: 0}, token1);
+    const res = await post(
+      `/api/matches/${matchId}/over`,
+      { bowledBy: 0 },
+      token1
+    );
 
     res.should.have.status(201);
   }
@@ -324,51 +350,62 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       },
     };
 
-    const makeRequest = () => post(`/api/matches/${matchId}/bowl`, payload, token1);
+    const makeRequest = () =>
+      post(`/api/matches/${matchId}/bowl`, payload, token1);
 
     await testWicketValidation(makeRequest, payload);
   });
 
-  const over1Bowls = [{
-    playedBy: 0,
-    singles: 1,
-  }, {
-    playedBy: 0,
-    singles: 1,
-    by: 2,
-  }, {
-    playedBy: 0,
-    by: 1,
-    legBy: 2,
-  }, {
-    playedBy: 0,
-    boundary: {
-      kind: 'regular',
-      run: 4,
+  const over1Bowls = [
+    {
+      playedBy: 0,
+      singles: 1,
     },
-  }, {
-    playedBy: 0,
-    singles: 2,
-    boundary: {
-      kind: 'by',
-      run: 4,
+    {
+      playedBy: 0,
+      singles: 1,
+      by: 2,
     },
-  }, {
-    playedBy: 0,
-    isWicket: {
-      kind: 'Bold',
+    {
+      playedBy: 0,
+      by: 1,
+      legBy: 2,
     },
-  }, {
-    playedBy: 2,
-    isWicket: {
-      kind: 'Run out',
-      player: 1,
+    {
+      playedBy: 0,
+      boundary: {
+        kind: 'regular',
+        run: 4,
+      },
     },
-  }];
-  const over2Bowls = [{
-    playedBy: 2,
-    singles: 1,
-  }];
+    {
+      playedBy: 0,
+      singles: 2,
+      boundary: {
+        kind: 'by',
+        run: 4,
+      },
+    },
+    {
+      playedBy: 0,
+      isWicket: {
+        kind: 'Bold',
+      },
+    },
+    {
+      playedBy: 2,
+      isWicket: {
+        kind: 'Run out',
+        player: 1,
+      },
+    },
+  ];
+  const over2Bowls = [
+    {
+      playedBy: 2,
+      singles: 1,
+    },
+  ];
   it('should add several bowls to match', async () => {
     let payload;
 
@@ -377,7 +414,6 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       res.should.have.status(201);
       return res.body;
     };
-
 
     for (payload of over1Bowls) {
       await makeRequest();
@@ -390,7 +426,12 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
   });
 
   async function testMatch1DataIntegrityWithBowls(...overs) {
-    const match1 = await testBasicDataIntegrity(matchId, token1, true, 'innings1');
+    const match1 = await testBasicDataIntegrity(
+      matchId,
+      token1,
+      true,
+      'innings1'
+    );
     match1.innings1.overs[0].bowledBy.should.be.equals(0);
     match1.innings1.overs[1].bowledBy.should.be.equals(0);
     for (let o = 0; o < overs.length; o++) {
@@ -452,10 +493,12 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
   });
 
   it('should have proper data in innings1 state', async () => {
-    await testMatch1DataIntegrityWithBowls(over1Bowls, [{
-      playedBy: over2Bowls[0].playedBy,
-      singles: 1,
-    }]);
+    await testMatch1DataIntegrityWithBowls(over1Bowls, [
+      {
+        playedBy: over2Bowls[0].playedBy,
+        singles: 1,
+      },
+    ]);
   });
 
   it('should not update bowl with invalid wicket', async () => {
@@ -466,40 +509,49 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       },
     };
 
-    const makeRequest = () => put(`/api/matches/${matchId}/bowl`, payload, token1);
+    const makeRequest = () =>
+      put(`/api/matches/${matchId}/bowl`, payload, token1);
 
     await testWicketValidation(makeRequest, payload);
   });
 
-  const bowlUpdatePayloads = [{
-    singles: 1,
-  }, {
-    singles: 1,
-    by: 2,
-  }, {
-    by: 1,
-    legBy: 2,
-  }, {
-    boundary: {
-      kind: 'regular',
-      run: 4,
+  const bowlUpdatePayloads = [
+    {
+      singles: 1,
     },
-  }, {
-    singles: 2,
-    boundary: {
-      kind: 'by',
-      run: 4,
+    {
+      singles: 1,
+      by: 2,
     },
-  }, {
-    isWicket: {
-      kind: 'Bold',
+    {
+      by: 1,
+      legBy: 2,
     },
-  }, {
-    isWicket: {
-      kind: 'Run out',
-      player: 1,
+    {
+      boundary: {
+        kind: 'regular',
+        run: 4,
+      },
     },
-  }];
+    {
+      singles: 2,
+      boundary: {
+        kind: 'by',
+        run: 4,
+      },
+    },
+    {
+      isWicket: {
+        kind: 'Bold',
+      },
+    },
+    {
+      isWicket: {
+        kind: 'Run out',
+        player: 1,
+      },
+    },
+  ];
   it('should update bowl without `overNo` and `bowlNo`', async () => {
     let payload;
 
@@ -523,20 +575,35 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       const errorParams = res.body.err.map((e) => e.param);
       if (overNo < 0) {
         errorParams.should.contain('overNo');
-        res.body.err.find((e) => e.param === 'overNo').msg.should.match(/non.?negative/i);
+        res.body.err
+          .find((e) => e.param === 'overNo')
+          .msg.should.match(/non.?negative/i);
       }
       if (bowlNo < 0) {
         errorParams.should.contain('bowlNo');
-        res.body.err.find((e) => e.param === 'bowlNo').msg.should.match(/non.?negative/i);
+        res.body.err
+          .find((e) => e.param === 'bowlNo')
+          .msg.should.match(/non.?negative/i);
       }
       if (overNo < 0 || bowlNo < 0) {
         return;
       }
-      res.body.err[0].should.contain({param: 'bowlNo', value: bowlNo, overNo});
-      res.body.err[0].msg.should.match(new RegExp(`over.*${overNo}.*bowl.*${bowlNo}`, 'i'));
+      res.body.err[0].should.contain({
+        param: 'bowlNo',
+        value: bowlNo,
+        overNo,
+      });
+      res.body.err[0].msg.should.match(
+        new RegExp(`over.*${overNo}.*bowl.*${bowlNo}`, 'i')
+      );
     };
 
-    for (const [overNo, bowlNo] of [[1, 1], [0, 7], [-1, 0], [0, -1]]) {
+    for (const [overNo, bowlNo] of [
+      [1, 1],
+      [0, 7],
+      [-1, 0],
+      [0, -1],
+    ]) {
       payload = {
         singles: 1,
         overNo,
@@ -573,7 +640,7 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
     };
     const res = await put(`/api/matches/${matchId}/bowl`, payload, token1);
     res.should.have.status(400);
-    res.body.err[0].should.contain({param: 'bowlNo', value: -1});
+    res.body.err[0].should.contain({ param: 'bowlNo', value: -1 });
   });
 
   it('should add by runs', async () => {
@@ -588,7 +655,7 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       await addBowl();
     }
 
-    payload = {run: 2};
+    payload = { run: 2 };
     const addByRun = async () => {
       const _res = await put(`/api/matches/${matchId}/by`, payload, token1);
       _res.should.have.status(200);
@@ -596,12 +663,20 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
     };
 
     const byRunResponse = await addByRun();
-    byRunResponse.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 3});
-    byRunResponse.bowl.should.contain({playedBy: 2, singles: 1, by: 2});
+    byRunResponse.should.deep.contain({
+      innings: 'innings1',
+      overIndex: 2,
+      bowlIndex: 3,
+    });
+    byRunResponse.bowl.should.contain({ playedBy: 2, singles: 1, by: 2 });
 
-    payload = {run: 4, boundary: true};
+    payload = { run: 4, boundary: true };
     const byBoundaryResponse = await addByRun();
-    byBoundaryResponse.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 3});
+    byBoundaryResponse.should.deep.contain({
+      innings: 'innings1',
+      overIndex: 2,
+      bowlIndex: 3,
+    });
     byBoundaryResponse.bowl.should.deep.contain({
       playedBy: 2,
       singles: 1,
@@ -612,9 +687,13 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       },
     });
 
-    payload = {run: 4, overNo: 2, bowlNo: 0};
+    payload = { run: 4, overNo: 2, bowlNo: 0 };
     const byBoundaryResponseWithIndices = await addByRun();
-    byBoundaryResponseWithIndices.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 0});
+    byBoundaryResponseWithIndices.should.deep.contain({
+      innings: 'innings1',
+      overIndex: 2,
+      bowlIndex: 0,
+    });
     byBoundaryResponseWithIndices.bowl.should.deep.contain({
       playedBy: 2,
       singles: 1,
@@ -628,11 +707,19 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       kind: 'Run out',
     };
     for (const payloadKey in payload) {
-      const res = await put(`/api/matches/${matchId}/uncertain-out`, {...payload, [payloadKey]: undefined}, token1);
+      const res = await put(
+        `/api/matches/${matchId}/uncertain-out`,
+        { ...payload, [payloadKey]: undefined },
+        token1
+      );
       res.should.have.status(400);
       res.body.err[0].param.should.be.equals(payloadKey);
     }
-    const res = await put(`/api/matches/${matchId}/uncertain-out`, {...payload, kind: 'Bold'}, token1);
+    const res = await put(
+      `/api/matches/${matchId}/uncertain-out`,
+      { ...payload, kind: 'Bold' },
+      token1
+    );
     res.should.have.status(400);
     res.body.err[0].param.should.be.equals('kind');
   });
@@ -640,7 +727,11 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
   it('should add uncertain wickets', async () => {
     let payload;
     const addUncertainWicket = async () => {
-      const _res = await put(`/api/matches/${matchId}/uncertain-out`, payload, token1);
+      const _res = await put(
+        `/api/matches/${matchId}/uncertain-out`,
+        payload,
+        token1
+      );
       _res.should.have.status(200);
       return _res.body;
     };
@@ -650,13 +741,17 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       kind: 'Run out',
     };
     let responseBody = await addUncertainWicket();
-    responseBody.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 3});
+    responseBody.should.deep.contain({
+      innings: 'innings1',
+      overIndex: 2,
+      bowlIndex: 3,
+    });
     responseBody.bowl.should.deep.contain({
-      isWicket: {player: 2, kind: 'Run out'},
+      isWicket: { player: 2, kind: 'Run out' },
       playedBy: 2,
       singles: 1,
       by: 2,
-      boundary: {kind: 'by', run: 4},
+      boundary: { kind: 'by', run: 4 },
     });
 
     payload = {
@@ -666,47 +761,62 @@ describe('Test Match Over & Bowl Functionality', function matchBowlTestSuit() {
       bowlNo: 1,
     };
     responseBody = await addUncertainWicket();
-    responseBody.should.deep.contain({innings: 'innings1', overIndex: 2, bowlIndex: 1});
+    responseBody.should.deep.contain({
+      innings: 'innings1',
+      overIndex: 2,
+      bowlIndex: 1,
+    });
     responseBody.bowl.should.deep.contain({
-      isWicket: {player: 1, kind: 'Run out'},
+      isWicket: { player: 1, kind: 'Run out' },
       playedBy: 2,
       singles: 1,
     });
   });
 
   it('should have proper data after updating bowls', async () => {
-    const currentOver2Bowls = [{
-      playedBy: over2Bowls[0].playedBy,
-      singles: 0, // caused by last iteration of test - should update bowl with `overNo` and `bowlNo`
-      by: 0,
-      legBy: 0,
-    }];
-    const currentOver3Bowls = [{
-      playedBy: 2,
-      singles: 1,
-      by: 4,
-      legBy: 0,
-    }, {
-      isWicket: {player: 1, kind: 'Run out'},
-      playedBy: 2,
-      singles: 1,
-      by: 0,
-      legBy: 0,
-    }, {
-      playedBy: 2,
-      singles: 1,
-      by: 0,
-      legBy: 0,
-    }, {
-      playedBy: 2,
-      singles: 1,
-      by: 2,
-      boundary: {
-        kind: 'by',
-        run: 4,
+    const currentOver2Bowls = [
+      {
+        playedBy: over2Bowls[0].playedBy,
+        singles: 0, // caused by last iteration of test - should update bowl with `overNo` and `bowlNo`
+        by: 0,
+        legBy: 0,
       },
-    }];
-    await testMatch1DataIntegrityWithBowls(over1Bowls, currentOver2Bowls, currentOver3Bowls);
+    ];
+    const currentOver3Bowls = [
+      {
+        playedBy: 2,
+        singles: 1,
+        by: 4,
+        legBy: 0,
+      },
+      {
+        isWicket: { player: 1, kind: 'Run out' },
+        playedBy: 2,
+        singles: 1,
+        by: 0,
+        legBy: 0,
+      },
+      {
+        playedBy: 2,
+        singles: 1,
+        by: 0,
+        legBy: 0,
+      },
+      {
+        playedBy: 2,
+        singles: 1,
+        by: 2,
+        boundary: {
+          kind: 'by',
+          run: 4,
+        },
+      },
+    ];
+    await testMatch1DataIntegrityWithBowls(
+      over1Bowls,
+      currentOver2Bowls,
+      currentOver3Bowls
+    );
   });
 
   after(tearDown);

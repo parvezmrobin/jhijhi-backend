@@ -4,12 +4,10 @@
  * Mar 29, 2020
  */
 
-const {
-  describe, before, it, after,
-} = require('mocha');
+const { describe, before, it, after } = require('mocha');
 const chai = require('chai');
-const {startUp, testBasicDataIntegrity} = require('./_matchHelpers');
-const {post, put, tearDown} = require('../_helpers');
+const { startUp, testBasicDataIntegrity } = require('./_matchHelpers');
+const { post, put, tearDown } = require('../_helpers');
 
 chai.should();
 
@@ -28,27 +26,41 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
 
   before(async () => {
     ({
-      token1, token2, playerIds1, teamIds1, teamIds2, umpireIds1, umpireIds2,
+      token1,
+      token2,
+      playerIds1,
+      teamIds1,
+      teamIds2,
+      umpireIds1,
+      umpireIds2,
     } = await startUp());
-    let res = await post('/api/matches/', {
-      name: 'match 1',
-      team1: teamIds1[0],
-      team2: teamIds1[1],
-      umpire1: umpireIds1[0],
-      umpire2: umpireIds1[1],
-      umpire3: umpireIds1[2],
-      overs: 4,
-    }, token1);
+    let res = await post(
+      '/api/matches/',
+      {
+        name: 'match 1',
+        team1: teamIds1[0],
+        team2: teamIds1[1],
+        umpire1: umpireIds1[0],
+        umpire2: umpireIds1[1],
+        umpire3: umpireIds1[2],
+        overs: 4,
+      },
+      token1
+    );
     matchId1 = res.body.match._id;
-    res = await post('/api/matches/', {
-      name: 'match 1',
-      team1: teamIds2[0],
-      team2: teamIds2[1],
-      umpire1: umpireIds2[0],
-      umpire2: umpireIds2[1],
-      umpire3: umpireIds2[2],
-      overs: 4,
-    }, token2);
+    res = await post(
+      '/api/matches/',
+      {
+        name: 'match 1',
+        team1: teamIds2[0],
+        team2: teamIds2[1],
+        umpire1: umpireIds2[0],
+        umpire2: umpireIds2[1],
+        umpire3: umpireIds2[2],
+        overs: 4,
+      },
+      token2
+    );
     matchId2 = res.body.match._id;
   });
 
@@ -61,7 +73,7 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
     };
 
     for (const key in matchBeginPayload) {
-      const payload = {...matchBeginPayload, [key]: null};
+      const payload = { ...matchBeginPayload, [key]: null };
       const res = await put(`/api/matches/${matchId1}/begin`, payload, token1);
 
       res.should.have.status(400);
@@ -70,14 +82,22 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
   });
 
   async function shouldHaveTeam1CaptainError(matchBeginPayload) {
-    const res = await put(`/api/matches/${matchId1}/begin`, matchBeginPayload, token1);
+    const res = await put(
+      `/api/matches/${matchId1}/begin`,
+      matchBeginPayload,
+      token1
+    );
 
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('team1Captain');
   }
 
   async function shouldHaveTeam2CaptainError(matchBeginPayload) {
-    const res = await put(`/api/matches/${matchId1}/begin`, matchBeginPayload, token1);
+    const res = await put(
+      `/api/matches/${matchId1}/begin`,
+      matchBeginPayload,
+      token1
+    );
 
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.contain('team2Captain');
@@ -121,7 +141,11 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
       team2Players: playerIds1.slice(3),
     };
 
-    const res = await put(`/api/matches/${matchId2}/begin`, matchBeginPayload, token1);
+    const res = await put(
+      `/api/matches/${matchId2}/begin`,
+      matchBeginPayload,
+      token1
+    );
 
     res.should.have.status(404);
   });
@@ -134,10 +158,16 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
       team2Players: playerIds1.slice(3),
     };
 
-    const res = await put(`/api/matches/${matchId1}/begin`, matchBeginPayload, token2);
+    const res = await put(
+      `/api/matches/${matchId1}/begin`,
+      matchBeginPayload,
+      token2
+    );
 
     res.should.have.status(400);
-    res.body.err.map((e) => e.param).should.have.members(['team1Players', 'team2Players']);
+    res.body.err
+      .map((e) => e.param)
+      .should.have.members(['team1Players', 'team2Players']);
   });
 
   it('should begin match', async () => {
@@ -148,7 +178,11 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
       team2Players: playerIds1.slice(3),
     };
 
-    const res = await put(`/api/matches/${matchId1}/begin`, matchBeginPayload, token1);
+    const res = await put(
+      `/api/matches/${matchId1}/begin`,
+      matchBeginPayload,
+      token1
+    );
 
     res.should.have.status(200);
     res.body.match.state.should.be.equal('toss');
@@ -164,7 +198,11 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
       singles: 1,
     };
 
-    const res = await post(`/api/matches/${matchId1}/bowl`, bowlPayload, token1);
+    const res = await post(
+      `/api/matches/${matchId1}/bowl`,
+      bowlPayload,
+      token1
+    );
     res.should.have.status(400);
     res.body.err[0].msg.should.match(/Cannot add bowl in state toss/i);
   });
@@ -186,19 +224,31 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
     };
 
     for (const key in tossPayload) {
-      const dumpedPayload = {...tossPayload, [key]: null};
+      const dumpedPayload = { ...tossPayload, [key]: null };
 
-      const res = await put(`/api/matches/${matchId1}/toss`, dumpedPayload, token1);
+      const res = await put(
+        `/api/matches/${matchId1}/toss`,
+        dumpedPayload,
+        token1
+      );
 
       res.should.have.status(400);
       res.body.err.map((e) => e.param).should.have.members([key]);
     }
 
-    let res = await put(`/api/matches/${matchId1}/toss`, {...tossPayload, won: teamIds1[2]}, token1);
+    let res = await put(
+      `/api/matches/${matchId1}/toss`,
+      { ...tossPayload, won: teamIds1[2] },
+      token1
+    );
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.have.members(['won']);
 
-    res = await put(`/api/matches/${matchId1}/toss`, {...tossPayload, choice: 'None'}, token1);
+    res = await put(
+      `/api/matches/${matchId1}/toss`,
+      { ...tossPayload, choice: 'None' },
+      token1
+    );
 
     res.should.have.status(400);
     res.body.err.map((e) => e.param).should.have.members(['choice']);
@@ -213,11 +263,14 @@ describe('Test Match Begin & Test Functionality', function matchBeginTestSuit() 
     const res = await put(`/api/matches/${matchId1}/toss`, tossPayload, token1);
 
     res.should.have.status(200);
-    const {match} = res.body;
+    const { match } = res.body;
     match.team1WonToss.should.be.true;
     match.team1BatFirst.should.be.false;
     match.state.should.be.equals('innings1');
-    match.innings1.should.have.property('overs').that.is.an('array').with.length(0);
+    match.innings1.should.have
+      .property('overs')
+      .that.is.an('array')
+      .with.length(0);
   });
 
   it('should not toss an already tossed match', async () => {

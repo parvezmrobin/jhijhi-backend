@@ -6,7 +6,6 @@
 
 const Logger = require('./logger');
 
-
 /**
  * @param response
  * @param err
@@ -34,7 +33,8 @@ function sendErrorResponse(response, err, message, user = null) {
     stack: err.stack,
     user,
   });
-  if (statusCode === 400) { // it is a validation error and should be sent with response payload
+  if (statusCode === 400) {
+    // it is a validation error and should be sent with response payload
     errorDescription.err = err.error || err.errors || err;
   }
 
@@ -44,12 +44,11 @@ function sendErrorResponse(response, err, message, user = null) {
 function send404Response(response, message) {
   Logger.error(`Error 404: ${response.req.originalUrl}`);
 
-  response.status(404)
-    .json({
-      success: false,
-      message,
-      err: [{msg: message}],
-    });
+  response.status(404).json({
+    success: false,
+    message,
+    err: [{ msg: message }],
+  });
 }
 
 /**
@@ -59,9 +58,9 @@ function send404Response(response, message) {
  * default is 'body'.
  */
 function nullEmptyValues(request, container = 'body') {
-  const params = {...request[container]};
+  const params = { ...request[container] };
   for (const key in params) {
-    if (params.hasOwnProperty(key)) {
+    if (Object.hasOwnProperty.call(params, key)) {
       if (params[key] === '' || params[key] === undefined) {
         params[key] = null;
       }
@@ -76,7 +75,8 @@ function nullEmptyValues(request, container = 'body') {
  * @return {String}
  */
 function namify(str, smallCase = false) {
-  return str.split(' ')
+  return str
+    .split(' ')
     .filter((s) => s)
     .map((s) => {
       const fistLetter = s[0].toUpperCase();

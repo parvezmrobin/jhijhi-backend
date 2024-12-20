@@ -4,7 +4,6 @@
  * Date: Apr 05, 2019
  */
 
-
 module.exports = {
   auth: {
     register: {

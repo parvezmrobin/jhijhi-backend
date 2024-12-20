@@ -4,15 +4,13 @@
  * Date: Apr 08, 2019
  */
 
+const { hashSync } = require('bcrypt');
+const User = require('../models/user');
 
-const User = require("../models/user");
-const {hashSync} = require("bcrypt");
-
-
-module.exports = async function () {
+module.exports = async function userSeeder() {
   const usernames = ['robin', 'mim', 'oishie', 'geshnu', 'pacada'];
-  await User.deleteMany({username: {$in: usernames}});
-  const users = usernames.map(username => ({
+  await User.deleteMany({ username: { $in: usernames } });
+  const users = usernames.map((username) => ({
     username,
     password: hashSync(username, 10),
   }));
