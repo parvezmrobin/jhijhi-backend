@@ -11,7 +11,7 @@ const PlayerRouter = require('./controllers/PlayerController');
 const TeamRouter = require('./controllers/TeamController');
 const MatchRouter = require('./controllers/MatchController');
 const UmpireRouter = require('./controllers/UmpireController');
-const {send404Response} = require('./lib/utils');
+const { send404Response } = require('./lib/utils');
 
 const app = express();
 
@@ -53,9 +53,13 @@ app.use((request, response, next) => {
   onFinished(response, (err) => {
     const pong = Date.now();
     const elapsed = (pong - ping) / 1000;
-    logger.info(`${(new Date()).toUTCString()} | ${request.method} ${request.originalUrl} ${
-      response.statusCode
-    } ${elapsed.toFixed(2)}s`, request.body, response.body);
+    logger.info(
+      `${new Date().toUTCString()} | ${request.method} ${request.originalUrl} ${
+        response.statusCode
+      } ${elapsed.toFixed(2)}s`,
+      request.body,
+      response.body
+    );
     if (err) {
       logger.error(err);
     }
@@ -95,8 +99,9 @@ app.use((req, res) => {
 
 // error handler
 // noinspection JSUnusedLocalSymbols
-app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-  logger.error({error: err, user: req.user});
+app.use((err, req, res) => {
+  // eslint-disable-line no-unused-vars
+  logger.error({ error: err, user: req.user });
 
   // generate the error
   res.status(err.status || 500);
